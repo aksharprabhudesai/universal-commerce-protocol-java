@@ -192,3 +192,56 @@ footer {
     text-align: center;
     color: var(--text-muted);
 }
+
+/* Added for new homepage sections */
+.hero-subtitle {
+    font-size: 1.25rem;
+    color: var(--text-muted);
+    max-width: 600px;
+    margin: 0 auto 2rem;
+}
+
+/* Feature List */
+.feature-list {
+    margin-top: 1.5rem;
+    list-style: none;
+    padding-left: 0;
+}
+
+.feature-list li {
+    position: relative;
+    padding-left: 1.5rem;
+    margin-bottom: 0.75rem;
+    color: var(--text-color);
+}
+
+.feature-list li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    font-weight: bold;
+}
+
+/* Specific Grid Layouts */
+.grid.three-col {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+@media (min-width: 1024px) {
+    .grid.three-col {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+.secondary {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    margin-left: 1rem;
+}
+
+.secondary:hover {
+    background: var(--surface-color);
+    border-color: var(--text-color);
+    transform: translateY(-2px);
+}
