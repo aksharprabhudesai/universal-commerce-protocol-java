@@ -34,6 +34,7 @@ repositories {
 
 dependencies {
     api 'org.springframework.boot:spring-boot-starter'
+    api 'tools.jackson.core:jackson-databind'
     compileOnly 'org.springframework.boot:spring-boot-starter-webmvc'
 
     // Resilience4j for built-in circuit breaking and retry decoration
