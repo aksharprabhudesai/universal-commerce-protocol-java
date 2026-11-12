@@ -250,19 +250,40 @@ public class MyCommerceConfiguration {
 
 ---
 
-## Example Project
+## Example Storefront & Testing with Any AI Agent
 
-A complete working example demonstrating configuration, the mock adapter, and discovery endpoint verification is located in [`examples/ucp-example`](examples/ucp-example).
+A stateful, agent-ready storefront implementing **all 6 UCP capabilities** (`catalog.search`, `catalog.lookup`, `cart`, `checkout`, `order`, `identity_linking`) and **all 3 network transports** (REST `/ucp/v1`, MCP Streamable HTTP `/ucp/mcp`, and A2A `/.well-known/agent-card.json`) is located in [`examples/ucp-example`](examples/ucp-example).
+
+### 1. Start the Sample Storefront
+```bash
+./gradlew -p examples/ucp-example bootRun
+```
+The server starts at `http://localhost:8082` and exposes UCP discovery at `http://localhost:8082/.well-known/ucp`.
+
+### 2. Connect Any MCP Agent (Claude Code, Cursor, Claude Desktop, Gemini CLI, Antigravity)
+Point your agent's MCP configuration directly at `http://localhost:8082/ucp/mcp`:
 
 ```bash
-cd examples/ucp-example
-../../gradlew bootRun
+claude mcp add --transport http ucp-store http://localhost:8082/ucp/mcp
 ```
+Or in `mcp_config.json` / `.cursor/mcp.json`:
+```json
+{
+  "mcpServers": {
+    "ucp-store": {
+      "url": "http://localhost:8082/ucp/mcp"
+    }
+  }
+}
+```
+Then prompt your agent in plain English:
+> *"Search the UCP store for coffee gear, create a cart for `cust-demo-01` with a burr grinder and two ceramic espresso cup sets, complete checkout, and give me the confirmed order ID."*
 
-Query the running example:
-```bash
-curl http://localhost:8082/.well-known/ucp
-```
+### 3. Connect Any HTTP / Autonomous Agent (OpenAI, Gemini, LangChain, CrewAI, A2A)
+Give any HTTP-enabled agent the discovery URL and let it self-negotiate transports and schemas:
+> *"Inspect `http://localhost:8082/.well-known/ucp` (or `http://localhost:8082/.well-known/agent-card.json`), discover the store's capabilities and endpoints, and purchase a mechanical keyboard for `cust-demo-01`."*
+
+See [`examples/ucp-example/README.md`](examples/ucp-example/README.md) for the full catalog seed list and `curl` walkthroughs.
 
 ---
 

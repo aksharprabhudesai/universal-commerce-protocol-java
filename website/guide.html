@@ -46,15 +46,31 @@ dependencies {
     &lt;version&gt;0.2.0&lt;/version&gt;
 &lt;/dependency&gt;</code></pre>
 
-        <h2>Example Application</h2>
-        <p>A fully functional example application is available in the <code>examples/ucp-example</code> directory (of
-            the source repository).
-            This project demonstrates how to configure the library, use the mock adapter, and verify the discovery
-            endpoint.
+        <h2>Example Application &amp; Testing with AI Agents</h2>
+        <p>A stateful, agent-ready storefront is available in the <code>examples/ucp-example</code> directory of the
+            repository. It implements all UCP capabilities (<code>catalog</code>, <code>cart</code>,
+            <code>checkout</code>, <code>order</code>, <code>identity_linking</code>) and exposes REST
+            (<code>/ucp/v1</code>), Model Context Protocol Streamable HTTP (<code>/ucp/mcp</code>), and an A2A Agent
+            Card (<code>/.well-known/agent-card.json</code>).
         </p>
-        <p>To run the example:</p>
-        <pre><code>cd examples/ucp-example
-../../gradlew bootRun</code></pre>
+        <p>Start the sample storefront:</p>
+        <pre><code>./gradlew -p examples/ucp-example bootRun</code></pre>
+
+        <h3>Connect via MCP (Claude Code, Cursor, Claude Desktop, Gemini CLI, Antigravity)</h3>
+        <pre><code>{
+  "mcpServers": {
+    "ucp-store": {
+      "url": "http://localhost:8082/ucp/mcp"
+    }
+  }
+}</code></pre>
+        <p>Then ask your agent: <em>"Search the UCP store for coffee gear, add a burr grinder and espresso cups to a
+                cart for cust-demo-01, and complete checkout."</em></p>
+
+        <h3>Connect Any Autonomous HTTP / A2A Agent</h3>
+        <p>Point any HTTP-capable agent at <code>http://localhost:8082/.well-known/ucp</code> or
+            <code>http://localhost:8082/.well-known/agent-card.json</code> so it can dynamically discover capabilities
+            and invoke either <code>/ucp/mcp</code> or <code>/ucp/v1</code>.</p>
 
         <h2>Configuration</h2>
         <p>Configure the library using standard Spring Boot properties in <code>application.properties</code> or
