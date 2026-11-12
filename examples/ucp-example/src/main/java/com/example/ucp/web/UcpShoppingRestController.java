@@ -1,11 +1,15 @@
 package com.example.ucp.web;
 
+import com.example.ucp.ap2.DemoAp2WalletService;
+import dev.ucomprotocol.ap2.Ap2MandateException;
+import dev.ucomprotocol.ap2.JwkKey;
 import dev.ucomprotocol.model.Cart;
 import dev.ucomprotocol.model.Checkout;
 import dev.ucomprotocol.model.Customer;
 import dev.ucomprotocol.model.Order;
 import dev.ucomprotocol.model.Product;
 import dev.ucomprotocol.spi.CommerceAdapter;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -27,6 +31,7 @@ import java.util.NoSuchElementException;
 
 /**
  * REST transport binding ({@code /ucp/v1}) exposing all UCP capabilities
+ * (including AP2 Mandates checkout verification when {@code ucp.ap2.enabled=true})
  * backed by the configured {@link CommerceAdapter}.
  */
 @RestController
@@ -34,9 +39,13 @@ import java.util.NoSuchElementException;
 public class UcpShoppingRestController {
 
     private final CommerceAdapter commerceAdapter;
+    private final DemoAp2WalletService demoWalletService;
 
-    public UcpShoppingRestController(CommerceAdapter commerceAdapter) {
+    public UcpShoppingRestController(
+            CommerceAdapter commerceAdapter,
+            ObjectProvider<DemoAp2WalletService> demoWalletProvider) {
         this.commerceAdapter = commerceAdapter;
+        this.demoWalletService = demoWalletProvider.getIfAvailable();
     }
 
     // --- Catalog (dev.ucp.shopping.catalog.search & lookup) ---
@@ -145,7 +154,7 @@ public class UcpShoppingRestController {
         return current;
     }
 
-    // --- Checkout (dev.ucp.shopping.checkout) ---
+    // --- Checkout (dev.ucp.shopping.checkout + dev.ucp.common.payment.ap2_mandate) ---
 
     @PostMapping("/checkout-sessions")
     public ResponseEntity<Checkout> createCheckout(@RequestBody CreateCheckoutRequest request) {
@@ -178,13 +187,44 @@ public class UcpShoppingRestController {
     }
 
     @PostMapping("/checkout-sessions/{id}/complete")
-    public Checkout completeCheckout(@PathVariable String id) {
-        return commerceAdapter.getCheckoutAdapter().completeCheckout(id);
+    public Checkout completeCheckout(
+            @PathVariable String id,
+            @RequestBody(required = false) CompleteCheckoutRequest request) {
+        Checkout.Ap2Data ap2 = null;
+        if (request != null) {
+            if (request.ap2() != null) {
+                ap2 = request.ap2();
+            } else if (request.checkoutMandate() != null && !request.checkoutMandate().isBlank()) {
+                ap2 = Checkout.Ap2Data.builder().checkoutMandate(request.checkoutMandate()).build();
+            }
+        }
+        return commerceAdapter.getCheckoutAdapter().completeCheckout(id, ap2);
     }
 
     @PostMapping("/checkout-sessions/{id}/cancel")
     public Checkout cancelCheckout(@PathVariable String id) {
         return commerceAdapter.getCheckoutAdapter().cancelCheckout(id);
+    }
+
+    // --- AP2 Demo Wallet Helper (active when ucp.ap2.enabled=true) ---
+
+    @GetMapping("/ap2/wallet-key")
+    public JwkKey getDemoWalletPublicKey() {
+        if (demoWalletService == null) {
+            throw new IllegalStateException("AP2 is currently disabled (ucp.ap2.enabled=false)");
+        }
+        return demoWalletService.getAgentPublicJwk();
+    }
+
+    @PostMapping("/ap2/mandates/sign")
+    public Map<String, Object> signAp2Mandate(@RequestBody SignMandateRequest request) {
+        if (demoWalletService == null) {
+            throw new IllegalStateException("AP2 is currently disabled (ucp.ap2.enabled=false)");
+        }
+        if (request == null || request.checkoutId() == null || request.checkoutId().isBlank()) {
+            throw new IllegalArgumentException("checkoutId is required");
+        }
+        return demoWalletService.signCheckoutMandate(request.checkoutId());
     }
 
     // --- Orders (dev.ucp.shopping.order) ---
@@ -233,6 +273,14 @@ public class UcpShoppingRestController {
 
     // --- Error Handling ---
 
+    @ExceptionHandler(Ap2MandateException.class)
+    public ResponseEntity<Map<String, Object>> handleAp2MandateError(Ap2MandateException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of(
+                        "error", ex.getErrorCode().getCode(),
+                        "message", ex.getMessage()));
+    }
+
     @ExceptionHandler(NoSuchElementException.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(NoSuchElementException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -261,6 +309,12 @@ public class UcpShoppingRestController {
     }
 
     public record CreateCheckoutRequest(String cartId, String customerId, List<LineItemInput> items) {
+    }
+
+    public record CompleteCheckoutRequest(Checkout.Ap2Data ap2, String checkoutMandate) {
+    }
+
+    public record SignMandateRequest(String checkoutId) {
     }
 
     public record CreateOrderRequest(String cartId) {
