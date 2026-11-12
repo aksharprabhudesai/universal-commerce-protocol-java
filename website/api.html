@@ -27,9 +27,9 @@
     </header>
 
     <main class="container">
-        <span class="badge">v0.2.0 &middot; UCP 2026-08-25</span>
+        <span class="badge">v0.3.0 &middot; UCP 2026-08-25 &middot; AP2 Mandates</span>
         <h1>API Reference</h1>
-        <p>Reference documentation for SPI adapters, resilience decorators, domain models, configuration properties, and discovery metadata.</p>
+        <p>Reference documentation for SPI adapters, AP2 cryptographic mandate services, resilience decorators, domain models, configuration properties, and discovery metadata.</p>
 
         <h2>Core Interface: <code>CommerceAdapter</code></h2>
         <p>The root Service Provider Interface (SPI) for all commerce capabilities. Implementations wire this interface to communicate with specific commerce backends.</p>
@@ -76,6 +76,7 @@
                 <li><code>Optional&lt;Checkout&gt; getCheckout(String checkoutId)</code>: Retrieve a checkout session by ID.</li>
                 <li><code>Checkout updateCheckout(String checkoutId, Checkout checkout)</code>: Update an active checkout session.</li>
                 <li><code>Checkout completeCheckout(String checkoutId)</code>: Complete checkout and finalize order placement.</li>
+                <li><code>default Checkout completeCheckout(String checkoutId, Checkout.Ap2Data ap2)</code>: Complete checkout with optional AP2 cryptographic mandate metadata (<code>dev.ucp.common.payment.ap2_mandate</code>).</li>
                 <li><code>Checkout cancelCheckout(String checkoutId)</code>: Cancel an active checkout session.</li>
             </ul>
         </div>
@@ -101,7 +102,12 @@
             </ul>
         </div>
 
-        <h2>Resilience</h2>
+        <h2>AP2 Mandates &amp; Resilience</h2>
+
+        <div class="card">
+            <h3><code>Ap2CommerceAdapter</code> &amp; <code>Ap2MandateService</code></h3>
+            <p>Implements the UCP <code>2026-08-25</code> AP2 Mandates extension (<code>dev.ucp.common.payment.ap2_mandate</code>) when <code>ucp.ap2.enabled=true</code>. Signs every <code>Checkout</code> using RFC 8785 <code>JcsCanonicalizer</code> + detached JWS (<code>ap2.merchant_authorization</code>), publishes the merchant EC public <code>JwkKey</code> in <code>/.well-known/ucp</code> <code>keys[]</code>, and validates <code>SD-JWT+kb</code> <code>ap2.checkout_mandate</code> credentials (throwing <code>Ap2MandateException</code> with canonical <code>Ap2ErrorCode</code>).</p>
+        </div>
 
         <div class="card">
             <h3><code>ResilientCommerceAdapter</code></h3>
@@ -143,7 +149,7 @@ String imageUrl;</code></pre>
         </div>
 
         <div class="card">
-            <h3><code>Checkout</code> &amp; <code>CheckoutStatus</code></h3>
+            <h3><code>Checkout</code>, <code>Checkout.Ap2Data</code> &amp; <code>CheckoutStatus</code></h3>
             <pre><code>String id;
 String customerId;
 String currency;
@@ -152,7 +158,8 @@ List&lt;Cart.CartItem&gt; items;
 BigDecimal totalAmount;
 String continueUrl;
 Instant expiresAt;
-String orderId;</code></pre>
+String orderId;
+Ap2Data ap2; // merchant_authorization (detached JWS), checkout_mandate (SD-JWT+kb)</code></pre>
         </div>
 
         <div class="card">
@@ -203,6 +210,11 @@ String phoneNumber;</code></pre>
                 <li><code>ucp.services.embedded-enabled</code>: Advertise the embedded OpenRPC shopping transport (<code>false</code> by default).</li>
                 <li><code>ucp.resilience.enabled</code>: Automatically wrap <code>CommerceAdapter</code> beans with Resilience4j (<code>true</code> by default).</li>
                 <li><code>ucp.resilience.instance-name</code>: Resilience4j instance name for circuit breaker and retry lookups (<code>ucp</code> by default).</li>
+                <li><code>ucp.ap2.enabled</code>: Enable AP2 Mandates checkout signing, mandate verification, and <code>/.well-known/ucp</code> <code>keys[]</code> (<code>false</code> by default).</li>
+                <li><code>ucp.ap2.key-id</code> / <code>ucp.ap2.algorithm</code>: Merchant signing JWK <code>kid</code> and ECDSA curve (<code>ES256</code>, <code>ES384</code>, <code>ES512</code>).</li>
+                <li><code>ucp.ap2.signing-private-key</code> / <code>ucp.ap2.signing-public-key</code>: Optional PKCS#8 / X.509 EC keys (auto-generates ephemeral key when <code>ucp.ap2.auto-generate-ephemeral-key=true</code>).</li>
+                <li><code>ucp.ap2.require-checkout-mandate</code> / <code>ucp.ap2.verify-mandate-signature</code>: Enforce cryptographic <code>SD-JWT+kb</code> verification on checkout completion (<code>true</code> by default).</li>
+                <li><code>ucp.ap2.trusted-platform-keys</code> / <code>ucp.ap2.allow-embedded-agent-jwk</code>: Configure trusted platform EC JWKs or allow embedded sandbox JWKs.</li>
             </ul>
         </div>
 

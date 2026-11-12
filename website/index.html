@@ -28,7 +28,7 @@
 
     <main>
         <section class="hero">
-            <span class="badge">v0.2.0 &middot; UCP 2026-08-25 &middot; Spring Boot 4</span>
+            <span class="badge">v0.3.0 &middot; UCP 2026-08-25 &middot; AP2 Mandates &middot; Spring Boot 4</span>
             <h1>Universal Commerce Protocol</h1>
             <p class="hero-subtitle">The standard for building agent-ready commerce applications on the JVM. Decouple your business
                 logic from backend implementation details.</p>
@@ -52,7 +52,8 @@
                     <li>A unified domain model (<code>Product</code>, <code>Cart</code>, <code>Checkout</code>,
                         <code>Order</code>, <code>Customer</code>)</li>
                     <li>Standardized Service Provider Interfaces (SPIs) with Resilience4j circuit breakers &amp; retries</li>
-                    <li>Automatic discovery at <code>/.well-known/ucp</code> advertising REST, MCP, A2A, and Embedded transports</li>
+                    <li>Automatic discovery at <code>/.well-known/ucp</code> advertising REST, MCP, A2A, Embedded transports, and public EC signing <code>keys[]</code></li>
+                    <li>Configuration-driven <strong>AP2 Mandates</strong> (<code>ucp.ap2.enabled=true</code>) for detached JWS checkout signing and <code>SD-JWT+kb</code> mandate verification</li>
                     <li>A runnable, stateful sample storefront (<code>examples/ucp-example</code>) ready for any AI agent</li>
                 </ul>
             </div>
@@ -114,13 +115,13 @@
             <h3>Gradle (Groovy)</h3>
             <pre><code>// build.gradle
 dependencies {
-    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.2.0'
+    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.3.0'
 }</code></pre>
 
             <h3>Gradle (Kotlin DSL)</h3>
             <pre><code>// build.gradle.kts
 dependencies {
-    implementation("dev.ucomprotocol:ucp-spring-boot-starter:0.2.0")
+    implementation("dev.ucomprotocol:ucp-spring-boot-starter:0.3.0")
 }</code></pre>
 
             <h3>Maven</h3>
@@ -128,7 +129,7 @@ dependencies {
 &lt;dependency&gt;
     &lt;groupId&gt;dev.ucomprotocol&lt;/groupId&gt;
     &lt;artifactId&gt;ucp-spring-boot-starter&lt;/artifactId&gt;
-    &lt;version&gt;0.2.0&lt;/version&gt;
+    &lt;version&gt;0.3.0&lt;/version&gt;
 &lt;/dependency&gt;</code></pre>
 
             <h2>Simple Usage</h2>
@@ -148,12 +149,12 @@ public class ProductService {
 }</code></pre>
 
             <h2>Test with Any AI Agent</h2>
-            <p>Run the bundled sample storefront (<code>examples/ucp-example</code>) to test all 6 UCP capabilities over
+            <p>Run the bundled sample storefront (<code>examples/ucp-example</code>) to test all core UCP capabilities plus AP2 Mandates over
                 MCP (<code>/ucp/mcp</code>), REST (<code>/ucp/v1</code>), and A2A
                 (<code>/.well-known/agent-card.json</code>):</p>
             <pre><code>./gradlew -p examples/ucp-example bootRun
 claude mcp add --transport http ucp-store http://localhost:8082/ucp/mcp</code></pre>
-            <p>Read the full walkthrough in <a href="post-testing-with-ai-agents.html" style="color: var(--accent);">How to Run and Test UCP Java 0.2.0 Locally with Any AI Agent</a> or see the <a href="guide.html#sample-storefront" style="color: var(--accent);">User Guide</a>.</p>
+            <p>Read the full walkthrough in <a href="post-testing-with-ai-agents.html" style="color: var(--accent);">How to Run and Test UCP Java 0.3.0 Locally with Any AI Agent</a> or see the <a href="guide.html#sample-storefront" style="color: var(--accent);">User Guide</a>.</p>
         </section>
     </main>
 

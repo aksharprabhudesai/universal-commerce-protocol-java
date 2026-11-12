@@ -30,18 +30,18 @@
         <h1>User Guide</h1>
 
         <h2>Installation</h2>
-        <p>Add <code>dev.ucomprotocol:ucp-spring-boot-starter:0.2.0</code> from Maven Central. Requires <strong>Spring Boot 4.x</strong> and <strong>Java 17+</strong> (use version <code>0.0.1</code> for Spring Boot 3.x).</p>
+        <p>Add <code>dev.ucomprotocol:ucp-spring-boot-starter:0.3.0</code> from Maven Central. Requires <strong>Spring Boot 4.x</strong> and <strong>Java 17+</strong> (use version <code>0.0.1</code> for Spring Boot 3.x).</p>
 
         <h3>Gradle (Groovy)</h3>
         <pre><code>// build.gradle
 dependencies {
-    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.2.0'
+    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.3.0'
 }</code></pre>
 
         <h3>Gradle (Kotlin DSL)</h3>
         <pre><code>// build.gradle.kts
 dependencies {
-    implementation("dev.ucomprotocol:ucp-spring-boot-starter:0.2.0")
+    implementation("dev.ucomprotocol:ucp-spring-boot-starter:0.3.0")
 }</code></pre>
 
         <h3>Maven</h3>
@@ -49,14 +49,15 @@ dependencies {
 &lt;dependency&gt;
     &lt;groupId&gt;dev.ucomprotocol&lt;/groupId&gt;
     &lt;artifactId&gt;ucp-spring-boot-starter&lt;/artifactId&gt;
-    &lt;version&gt;0.2.0&lt;/version&gt;
+    &lt;version&gt;0.3.0&lt;/version&gt;
 &lt;/dependency&gt;</code></pre>
 
         <h2 id="sample-storefront">Example Application &amp; Testing with AI Agents</h2>
         <p>A stateful, agent-ready storefront is available in the <code>examples/ucp-example</code> directory of the
-            repository. It implements all 6 UCP capabilities (<code>catalog.search</code>, <code>catalog.lookup</code>,
-            <code>cart</code>, <code>checkout</code>, <code>order</code>, <code>identity_linking</code>) and exposes REST
-            (<code>/ucp/v1</code>), Model Context Protocol Streamable HTTP (<code>/ucp/mcp</code> with 16 tools), and an
+            repository. It implements all core UCP capabilities plus configuration-driven <strong>AP2 Mandates</strong>
+            (<code>catalog.search</code>, <code>catalog.lookup</code>, <code>cart</code>, <code>checkout</code>,
+            <code>payment.ap2_mandate</code>, <code>order</code>, <code>identity_linking</code>) and exposes REST
+            (<code>/ucp/v1</code>), Model Context Protocol Streamable HTTP (<code>/ucp/mcp</code> with 17 tools), and an
             A2A Agent Card (<code>/.well-known/agent-card.json</code>).
         </p>
         <p>Start the sample storefront (listens on <code>http://localhost:8082</code>):</p>
@@ -73,13 +74,13 @@ dependencies {
   }
 }</code></pre>
         <p>Then ask your agent: <em>"Search the UCP store for coffee gear, add a burr grinder and espresso cups to a
-                cart for cust-demo-01, and complete checkout."</em></p>
+                cart for cust-demo-01, sign an AP2 checkout mandate, and complete checkout."</em></p>
 
         <h3>Connect Any Autonomous HTTP / A2A Agent</h3>
         <p>Point any HTTP-capable agent at <code>http://localhost:8082/.well-known/ucp</code> or
             <code>http://localhost:8082/.well-known/agent-card.json</code> so it can dynamically discover capabilities
             and invoke either <code>/ucp/mcp</code> or <code>/ucp/v1</code>. For a complete step-by-step walkthrough with
-            <code>curl</code> and JUnit examples, read <a href="post-testing-with-ai-agents.html" style="color: var(--accent);">How to Run and Test UCP Java 0.2.0 Locally with Any AI Agent</a>.</p>
+            <code>curl</code> and JUnit examples, read <a href="post-testing-with-ai-agents.html" style="color: var(--accent);">How to Run and Test UCP Java 0.3.0 Locally with Any AI Agent</a>.</p>
 
         <h2>Configuration</h2>
         <p>Configure the library using standard Spring Boot properties in <code>application.properties</code> or
@@ -89,11 +90,11 @@ dependencies {
         <pre><code># Default to mock provider for testing
 ucp.provider=mock
 
-# Example: External Provider Configuration
-# ucp.provider=shopify
-# ucp.endpoint=https://my-store.myshopify.com
-# ucp.api-key=shpat_xxxxxxxx
-# ucp.api-secret=shpss_xxxxxxxx
+# Optional: Configuration-Driven AP2 Mandates (dev.ucp.common.payment.ap2_mandate)
+ucp.ap2.enabled=true
+ucp.ap2.key-id=merchant-ap2-2026
+ucp.ap2.algorithm=ES256
+ucp.ap2.require-checkout-mandate=true
 
 # Optional: Advertised Transport Endpoints for Discovery (/.well-known/ucp)
 # ucp.services.rest-endpoint=https://shop.example.com/ucp/v1
@@ -139,7 +140,7 @@ public Checkout startAndCompleteCheckout(Cart cart) {
         <pre><code>// build.gradle
 dependencies {
     // 1. Add UCP Java
-    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.2.0'
+    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.3.0'
     
     // 2. Ensure you have the Web MVC Starter (Discovery only works in web apps)
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
@@ -264,9 +265,29 @@ resilience4j.circuitbreaker.instances.ucp.failureRateThreshold=50
 resilience4j.retry.instances.ucp.maxAttempts=3
 resilience4j.retry.instances.ucp.waitDuration=500ms</code></pre>
 
+        <h2>AP2 Cryptographic Mandates</h2>
+        <p>Set <code>ucp.ap2.enabled=true</code> to enable the UCP <code>2026-08-25</code> <strong>AP2 Mandates</strong> extension (<code>dev.ucp.common.payment.ap2_mandate</code>) without modifying your <code>CommerceAdapter</code> code. When enabled, <code>Ap2CommerceAdapter</code> signs every <code>Checkout</code> using RFC 8785 JCS + detached JWS (<code>ap2.merchant_authorization</code>), publishes your public EC JWK in <code>/.well-known/ucp</code> <code>keys[]</code>, and verifies <code>SD-JWT+kb</code> <code>ap2.checkout_mandate</code> tokens during <code>completeCheckout(checkoutId, ap2)</code>:</p>
+        <pre><code>ucp.ap2.enabled=true
+ucp.ap2.key-id=merchant-ap2-2026
+ucp.ap2.algorithm=ES256
+ucp.ap2.require-checkout-mandate=true
+
+# Optional production PEM/Base64 keys (auto-generates ephemeral EC key if omitted):
+# ucp.ap2.auto-generate-ephemeral-key=false
+# ucp.ap2.signing-private-key=-----BEGIN PRIVATE KEY-----...
+# ucp.ap2.signing-public-key=-----BEGIN PUBLIC KEY-----...</code></pre>
+
         <h2>Changelog</h2>
         <div class="card" style="margin-bottom: 1.5rem;">
-            <h3>v0.2.0 (Current)</h3>
+            <h3>v0.3.0 (Current)</h3>
+            <ul style="margin-left: 1.25rem;">
+                <li>Added configuration-driven <strong>AP2 Mandates</strong> (<code>dev.ucp.common.payment.ap2_mandate</code>): <code>Ap2MandateService</code>, <code>Ap2CommerceAdapter</code>, RFC 8785 <code>JcsCanonicalizer</code>, <code>JwkKey</code>, and <code>ucp.ap2.*</code> properties.</li>
+                <li>Updated <code>UcpDiscoveryController</code> to advertise <code>dev.ucp.common.payment.ap2_mandate</code> and top-level <code>keys[]</code> when AP2 is enabled.</li>
+                <li>Updated <code>examples/ucp-example</code> with end-to-end AP2 mandate signing and enforcement across REST, MCP, and A2A.</li>
+            </ul>
+        </div>
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <h3>v0.2.0</h3>
             <ul style="margin-left: 1.25rem;">
                 <li>Added <code>Checkout</code> model and <code>CheckoutAdapter</code> SPI supporting canonical <code>dev.ucp.shopping.checkout</code> discovery.</li>
                 <li>Added <code>ResilientCommerceAdapter</code> and <code>ucp.resilience.*</code> auto-decoration with Resilience4j <code>CircuitBreaker</code> and <code>Retry</code>.</li>

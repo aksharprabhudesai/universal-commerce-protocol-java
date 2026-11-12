@@ -16,8 +16,9 @@ The **Universal Commerce Protocol (UCP)** library is a standardized, protocol-ag
 
 * **Unified Domain Models:** Standardized POJOs for `Product`, `Cart`, `Checkout`, `Order`, and `Customer`.
 * **Provider Agnostic:** Switch commerce providers via configuration without touching business logic.
+* **Configuration-Driven AP2 Mandates:** Turn on cryptographic checkout signing (`ap2.merchant_authorization`) and verifiable `SD-JWT+kb` mandate enforcement (`ap2.checkout_mandate`) with `ucp.ap2.enabled=true`.
 * **Spring Boot Auto-Configuration:** Automatically registers the active `CommerceAdapter` and IDE configuration metadata (`spring-configuration-metadata.json`).
-* **Discovery Endpoint:** Exposes protocol metadata at `/.well-known/ucp` conforming to UCP specification `2026-08-25` when Spring Web MVC is on the classpath.
+* **Discovery Endpoint:** Exposes protocol metadata and public EC signing keys (`keys[]`) at `/.well-known/ucp` conforming to UCP specification `2026-08-25` when Spring Web MVC is on the classpath.
 * **Multi-Transport Support:** Advertise REST, MCP (Model Context Protocol), A2A (Agent-to-Agent), and Embedded OpenRPC endpoints.
 * **Resilience Built-in:** Automatic circuit breaking and retries around `CommerceAdapter` operations via `ResilientCommerceAdapter` and Resilience4j.
 
@@ -34,14 +35,14 @@ The **Universal Commerce Protocol (UCP)** library is a standardized, protocol-ag
 #### Gradle (Groovy)
 ```groovy
 dependencies {
-    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.2.0'
+    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.3.0'
 }
 ```
 
 #### Gradle (Kotlin DSL)
 ```kotlin
 dependencies {
-    implementation("dev.ucomprotocol:ucp-spring-boot-starter:0.2.0")
+    implementation("dev.ucomprotocol:ucp-spring-boot-starter:0.3.0")
 }
 ```
 
@@ -50,7 +51,7 @@ dependencies {
 <dependency>
     <groupId>dev.ucomprotocol</groupId>
     <artifactId>ucp-spring-boot-starter</artifactId>
-    <version>0.2.0</version>
+    <version>0.3.0</version>
 </dependency>
 ```
 
@@ -85,109 +86,57 @@ public class StoreService {
 
 ---
 
+## Configuration-Driven AP2 Mandates (`dev.ucp.common.payment.ap2_mandate`)
+
+Enable cryptographic **AP2 Mandates** directly via `application.properties`—zero adapter code changes required:
+
+```properties
+ucp.ap2.enabled=true
+ucp.ap2.key-id=merchant-ap2-2026
+ucp.ap2.algorithm=ES256
+ucp.ap2.require-checkout-mandate=true
+
+# Optional for production (ephemeral EC key pair is generated if omitted):
+# ucp.ap2.auto-generate-ephemeral-key=false
+# ucp.ap2.signing-private-key=-----BEGIN PRIVATE KEY-----...
+# ucp.ap2.signing-public-key=-----BEGIN PUBLIC KEY-----...
+
+# Pre-trusted platform/agent JWKs (or set ucp.ap2.allow-embedded-agent-jwk=true for sandboxes):
+# ucp.ap2.trusted-platform-keys[0].kid=platform-key-1
+# ucp.ap2.trusted-platform-keys[0].crv=P-256
+# ucp.ap2.trusted-platform-keys[0].x=...
+# ucp.ap2.trusted-platform-keys[0].y=...
+```
+
+When `ucp.ap2.enabled=true`, UCP Java automatically:
+1. Publishes `dev.ucp.common.payment.ap2_mandate` (`extends: dev.ucp.shopping.checkout`) and your merchant EC public JWK in top-level `keys[]` at `/.well-known/ucp`.
+2. Wraps `CommerceAdapter` in `Ap2CommerceAdapter`, computing RFC 8785 JCS canonicalization and attaching a detached JWS (`ap2.merchant_authorization`) to every `Checkout`.
+3. Verifies incoming `SD-JWT+kb` (`dc+sd-jwt`) `ap2.checkout_mandate` credentials on `completeCheckout(checkoutId, ap2)`—raising `Ap2MandateException` with canonical UCP error codes (`mandate_required`, `mandate_expired`, `mandate_invalid_signature`, `agent_missing_key`, `mandate_scope_mismatch`, `merchant_authorization_invalid`, `merchant_authorization_missing`).
+
+---
+
 ## Discovery Endpoint Configuration
 
-UCP Java provides an **Automatic Discovery Endpoint** at `/.well-known/ucp`. This allows clients, agents, and external systems to discover which capabilities and transport services your application supports.
+UCP Java provides an **Automatic Discovery Endpoint** at `/.well-known/ucp`.
 
 ### How to Enable
 
-Include `spring-boot-starter-webmvc` alongside UCP Java. The starter detects Servlet Web MVC and automatically registers the controller (non-web and WebFlux apps do not pull in Tomcat).
+Include `spring-boot-starter-webmvc` alongside UCP Java:
 
 ```groovy
 dependencies {
-    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.2.0'
+    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.3.0'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 }
 ```
 
 ### Advertising Transport Services (Optional)
 
-Configure transport endpoints for the `dev.ucp.shopping` service in `application.properties`:
-
 ```properties
-# REST transport endpoint
 ucp.services.rest-endpoint=https://shop.example.com/ucp/v1
-
-# MCP (Model Context Protocol) transport endpoint
 ucp.services.mcp-endpoint=https://shop.example.com/ucp/mcp
-
-# A2A (Agent-to-Agent) card URL
 ucp.services.a2a-endpoint=https://shop.example.com/.well-known/agent-card.json
-
-# Embedded OpenRPC transport
 ucp.services.embedded-enabled=true
-```
-
-### Verification
-
-Once your application starts, query the endpoint:
-
-```bash
-curl http://localhost:8080/.well-known/ucp
-```
-
-**Response Example (conforming to UCP 2026-08-25):**
-```json
-{
-  "ucp": {
-    "version": "2026-08-25",
-    "services": {
-      "dev.ucp.shopping": [
-        {
-          "version": "2026-08-25",
-          "spec": "https://ucp.dev/2026-08-25/specification/overview/",
-          "transport": "rest",
-          "endpoint": "https://shop.example.com/ucp/v1",
-          "schema": "https://ucp.dev/2026-08-25/services/shopping/rest.openapi.json"
-        }
-      ]
-    },
-    "capabilities": {
-      "dev.ucp.shopping.catalog.search": [
-        {
-          "version": "2026-08-25",
-          "spec": "https://ucp.dev/2026-08-25/specification/shopping/catalog/search/",
-          "schema": "https://ucp.dev/2026-08-25/schemas/shopping/catalog_search.json"
-        }
-      ],
-      "dev.ucp.shopping.catalog.lookup": [
-        {
-          "version": "2026-08-25",
-          "spec": "https://ucp.dev/2026-08-25/specification/shopping/catalog/lookup/",
-          "schema": "https://ucp.dev/2026-08-25/schemas/shopping/catalog_lookup.json"
-        }
-      ],
-      "dev.ucp.shopping.cart": [
-        {
-          "version": "2026-08-25",
-          "spec": "https://ucp.dev/2026-08-25/specification/shopping/cart/",
-          "schema": "https://ucp.dev/2026-08-25/schemas/shopping/cart.json"
-        }
-      ],
-      "dev.ucp.shopping.checkout": [
-        {
-          "version": "2026-08-25",
-          "spec": "https://ucp.dev/2026-08-25/specification/shopping/checkout/",
-          "schema": "https://ucp.dev/2026-08-25/schemas/shopping/checkout.json"
-        }
-      ],
-      "dev.ucp.shopping.order": [
-        {
-          "version": "2026-08-25",
-          "spec": "https://ucp.dev/2026-08-25/specification/shopping/order/",
-          "schema": "https://ucp.dev/2026-08-25/schemas/shopping/order.json"
-        }
-      ],
-      "dev.ucp.common.identity_linking": [
-        {
-          "version": "2026-08-25",
-          "spec": "https://ucp.dev/2026-08-25/specification/common/identity-linking/",
-          "schema": "https://ucp.dev/2026-08-25/schemas/common/identity_linking.json"
-        }
-      ]
-    }
-  }
-}
 ```
 
 ---
@@ -206,12 +155,23 @@ curl http://localhost:8080/.well-known/ucp
 | `ucp.services.embedded-enabled` | `false` | Advertise the embedded OpenRPC shopping transport binding. |
 | `ucp.resilience.enabled` | `true` | Automatically decorate `CommerceAdapter` beans with Resilience4j circuit breaker and retry. |
 | `ucp.resilience.instance-name` | `ucp` | Resilience4j `CircuitBreaker` and `Retry` instance name. |
+| `ucp.ap2.enabled` | `false` | Enable AP2 Mandates checkout signing, verification, and `/.well-known/ucp` `keys[]`. |
+| `ucp.ap2.key-id` | `merchant-ap2-key-1` | Merchant signing JWK `kid`. |
+| `ucp.ap2.algorithm` | `ES256` | JWS ECDSA curve/algorithm (`ES256`, `ES384`, `ES512`). |
+| `ucp.ap2.signing-private-key` | - | PKCS#8 PEM or Base64 EC private key. |
+| `ucp.ap2.signing-public-key` | - | X.509 PEM or Base64 EC public key. |
+| `ucp.ap2.auto-generate-ephemeral-key` | `true` | Auto-generate an in-memory EC key pair when explicit keys are omitted. |
+| `ucp.ap2.require-checkout-mandate` | `true` | Reject `completeCheckout` without `ap2.checkout_mandate` (`mandate_required`). |
+| `ucp.ap2.verify-mandate-signature` | `true` | Cryptographically verify `SD-JWT+kb` signatures on `ap2.checkout_mandate`. |
+| `ucp.ap2.allow-embedded-agent-jwk` | `false` | Accept self-contained agent JWKs in mandate headers/`cnf.jwk` for sandboxes. |
+| `ucp.ap2.vp-formats` | `["dc+sd-jwt"]` | Verifiable Presentation formats advertised in `vp_formats_supported`. |
+| `ucp.ap2.trusted-platform-keys` | `[]` | Pre-trusted platform/agent EC public JWKs (`kid`, `crv`, `x`, `y`, `alg`). |
 
 ---
 
 ## Custom Adapters
 
-To integrate a custom commerce provider, implement the `CommerceAdapter` interface and declare it as a Spring `@Bean`. The auto-configuration automatically backs off from the mock adapter and wraps your adapter with Resilience4j protection:
+To integrate a custom commerce provider, implement the `CommerceAdapter` interface and declare it as a Spring `@Bean`. The auto-configuration automatically backs off from the mock adapter and wraps your adapter with Resilience4j protection (and `Ap2CommerceAdapter` when `ucp.ap2.enabled=true`):
 
 ```java
 @Configuration
@@ -253,13 +213,13 @@ public class MyCommerceConfiguration {
 
 ## Example Storefront & Testing with Any AI Agent
 
-A stateful, agent-ready storefront implementing **all 6 UCP capabilities** (`catalog.search`, `catalog.lookup`, `cart`, `checkout`, `order`, `identity_linking`) and **all 3 network transports** (REST `/ucp/v1`, MCP Streamable HTTP `/ucp/mcp`, and A2A `/.well-known/agent-card.json`) is located in [`examples/ucp-example`](examples/ucp-example).
+A stateful, agent-ready storefront implementing **all core UCP capabilities + AP2 Mandates** (`catalog.search`, `catalog.lookup`, `cart`, `checkout`, `payment.ap2_mandate`, `order`, `identity_linking`) and **all 3 network transports** (REST `/ucp/v1`, MCP Streamable HTTP `/ucp/mcp`, and A2A `/.well-known/agent-card.json`) is located in [`examples/ucp-example`](examples/ucp-example).
 
 ### 1. Start the Sample Storefront
 ```bash
 ./gradlew -p examples/ucp-example bootRun
 ```
-The server starts at `http://localhost:8082` and exposes UCP discovery at `http://localhost:8082/.well-known/ucp`.
+The server starts at `http://localhost:8082` and exposes UCP discovery (including AP2 `keys[]`) at `http://localhost:8082/.well-known/ucp`.
 
 ### 2. Connect Any MCP Agent (Claude Code, Cursor, Claude Desktop, Gemini CLI, Antigravity)
 Point your agent's MCP configuration directly at `http://localhost:8082/ucp/mcp`:
@@ -267,40 +227,30 @@ Point your agent's MCP configuration directly at `http://localhost:8082/ucp/mcp`
 ```bash
 claude mcp add --transport http ucp-store http://localhost:8082/ucp/mcp
 ```
-Or in `mcp_config.json` / `.cursor/mcp.json`:
-```json
-{
-  "mcpServers": {
-    "ucp-store": {
-      "url": "http://localhost:8082/ucp/mcp"
-    }
-  }
-}
-```
 Then prompt your agent in plain English:
-> *"Search the UCP store for coffee gear, create a cart for `cust-demo-01` with a burr grinder and two ceramic espresso cup sets, complete checkout, and give me the confirmed order ID."*
+> *"Search the UCP store for coffee gear, create a cart for `cust-demo-01` with a burr grinder and two ceramic espresso cup sets, sign an AP2 checkout mandate, complete checkout, and give me the confirmed order ID."*
 
-### 3. Connect Any HTTP / Autonomous Agent (OpenAI, Gemini, LangChain, CrewAI, A2A)
-Give any HTTP-enabled agent the discovery URL and let it self-negotiate transports and schemas:
-> *"Inspect `http://localhost:8082/.well-known/ucp` (or `http://localhost:8082/.well-known/agent-card.json`), discover the store's capabilities and endpoints, and purchase a mechanical keyboard for `cust-demo-01`."*
-
-See [`examples/ucp-example/README.md`](examples/ucp-example/README.md) for the full catalog seed list and `curl` walkthroughs.
+See [`examples/ucp-example/README.md`](examples/ucp-example/README.md) for the full catalog seed list, AP2 configuration toggles, and `curl` walkthroughs.
 
 ---
 
 ## Changelog
 
+### 0.3.0
+* Added configuration-driven **AP2 Mandates** (`dev.ucp.common.payment.ap2_mandate`) conforming to UCP `2026-08-25`:
+  * Added `Checkout.Ap2Data` (`merchant_authorization`, `checkout_mandate`), `JwkKey`, `Ap2ErrorCode`, and `Ap2MandateException`.
+  * Added RFC 8785 `JcsCanonicalizer` and `Ap2MandateService` supporting `ES256`/`ES384`/`ES512` detached JWS checkout signing and `SD-JWT+kb` (`dc+sd-jwt`) mandate verification and minting.
+  * Added `Ap2CommerceAdapter`, `UcpProperties.Ap2` (`ucp.ap2.*`), and top-level `keys[]` + `dev.ucp.common.payment.ap2_mandate` publication in `UcpDiscoveryController`.
+* Updated `examples/ucp-example` with configuration-driven AP2 enforcement across REST, MCP (`sign_ap2_checkout_mandate` + `complete_checkout`), and A2A.
+
 ### 0.2.0
-* Added **`Checkout`** model and **`CheckoutAdapter`** SPI supporting the canonical **`dev.ucp.shopping.checkout`** capability in discovery (via backwards-compatible `default` method on `CommerceAdapter`).
+* Added **`Checkout`** model and **`CheckoutAdapter`** SPI supporting the canonical **`dev.ucp.shopping.checkout`** capability in discovery.
 * Added **`ResilientCommerceAdapter`** and `ucp.resilience.*` configuration to automatically decorate `CommerceAdapter` beans with Resilience4j `CircuitBreaker` and `Retry`.
-* Made `spring-boot-starter-webmvc` optional (`compileOnly`) and guarded web auto-configuration with `@ConditionalOnClass` and `@ConditionalOnBean(CommerceAdapter.class)` so non-web and WebFlux applications are not forced onto Servlet/Tomcat.
-* Added `spring-boot-configuration-processor` to generate `META-INF/spring-configuration-metadata.json` for IDE property autocomplete.
-* Added `embedded` transport support (`ucp.services.embedded-enabled`) and `extends`/`config` fields on discovery `Capability`.
-* Upgraded Gradle wrapper to **9.9.1** and aligned API reference documentation with SPI signatures.
+* Made `spring-boot-starter-webmvc` optional (`compileOnly`) and added IDE `spring-configuration-metadata.json` generation.
+* Upgraded Gradle wrapper to **9.9.1**.
 
 ### 0.1.0
-* Upgraded to **Spring Boot 4.1.2** (Jackson 3, Spring Framework 7) and **Resilience4j 2.4.0**.
-* Discovery endpoint (`/.well-known/ucp`) aligned with **UCP Specification 2026-08-25** (`capabilities` and `services` maps, schema URLs, `catalog.search` / `catalog.lookup`, `identity_linking`, and `ucp.services.*`).
+* Upgraded to **Spring Boot 4.1.2** (Jackson 3, Spring Framework 7) and **Resilience4j 2.4.0**; aligned discovery with **UCP Specification 2026-08-25**.
 
 ### 0.0.1
 * Initial release (Spring Boot 3.2, UCP 2026-01-23).
