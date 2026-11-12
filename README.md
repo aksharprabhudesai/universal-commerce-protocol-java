@@ -8,6 +8,7 @@ The **Universal Commerce Protocol (UCP)** library is a standardized, protocol-ag
 * **Website**: [ucomprotocol.dev](https://ucomprotocol.dev)
 * **Official Specification**: [ucp.dev](https://ucp.dev) (Version `2026-08-25`)
 * **Javadoc Reference**: [ucomprotocol.dev/javadocs](https://ucomprotocol.dev/javadocs/)
+* **Agentic Protocols Portal**: [agenticprotocols.dev/ucp.html](https://agenticprotocols.dev/ucp.html)
 
 ---
 

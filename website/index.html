@@ -44,12 +44,14 @@
                 <p>The Universal Commerce Protocol (UCP) is an open standard that defines a unified interface for
                     commerce operations. It abstracts away the complexity of different e-commerce backends (Shopify,
                     Magento, Salesforce, etc.) into a single, consistent API.</p>
-                <p><strong>UCP Java</strong> is the reference implementation for the JVM, built on top of Spring Boot.
-                    It provides:</p>
+                <p><strong>UCP Java</strong> is the Spring Boot 4 starter for the JVM, aligned with UCP specification
+                    <code>2026-08-25</code>. It provides:</p>
                 <ul class="feature-list">
-                    <li>A unified domain model (Product, Cart, Order, Customer)</li>
-                    <li>Standardized Service Provider Interfaces (SPIs)</li>
-                    <li>Automatic configuration and wiring</li>
+                    <li>A unified domain model (<code>Product</code>, <code>Cart</code>, <code>Checkout</code>,
+                        <code>Order</code>, <code>Customer</code>)</li>
+                    <li>Standardized Service Provider Interfaces (SPIs) with Resilience4j circuit breakers &amp; retries</li>
+                    <li>Automatic discovery at <code>/.well-known/ucp</code> advertising REST, MCP, A2A, and Embedded transports</li>
+                    <li>A runnable, stateful sample storefront (<code>examples/ucp-example</code>) ready for any AI agent</li>
                 </ul>
             </div>
         </section>
@@ -58,18 +60,19 @@
             <h2>Who is this for?</h2>
             <div class="grid three-col">
                 <div class="card">
+                    <h3>🤖 Agentic Commerce</h3>
+                    <p>Make your storefront immediately discoverable and operable by AI agents via
+                        <code>/.well-known/ucp</code>, Model Context Protocol (MCP), REST, and Agent-to-Agent (A2A)
+                        transports.</p>
+                </div>
+                <div class="card">
                     <h3>🚀 Platform Builders</h3>
                     <p>Building a SaaS that needs to integrate with your customers' existing stores? Write your
                         integration once against UCP and support every major commerce backend instantly.</p>
                 </div>
                 <div class="card">
-                    <h3>🔗 Integration Specialists</h3>
-                    <p>Connect ERPs, CRMs, and POS systems to multiple e-commerce platforms without maintaining N
-                        distinct integration codebases. Normalize data at the edge.</p>
-                </div>
-                <div class="card">
                     <h3>🏢 Enterprise Teams</h3>
-                    <p>Migrating from a monolith to microservices? Or merging multiple acquired brands? Use UCP as an
+                    <p>Migrating from a monolith to microservices or unifying multiple brands? Use UCP as an
                         anti-corruption layer to standardize commerce logic across your organization.</p>
                 </div>
             </div>
@@ -80,25 +83,25 @@
             <div class="grid">
                 <div class="card">
                     <h3>⚡ Unified Domain Model</h3>
-                    <p>Stop mapping JSON manually. Use standardized <code>Product</code>, <code>Cart</code>, and
-                        <code>Order</code> POJOs that behave consistently across any backend implementation.
+                    <p>Stop mapping JSON manually. Use standardized <code>Product</code>, <code>Cart</code>,
+                        <code>Checkout</code>, <code>Order</code>, and <code>Customer</code> POJOs across any backend.
                     </p>
                 </div>
                 <div class="card">
-                    <h3>🔧 Spring Boot Native</h3>
-                    <p>Zero-boilerplate configuration. Add the starter, define your properties, and inject
-                        `CommerceAdapter`. It feels just like using Spring Data.</p>
+                    <h3>🔧 Spring Boot 4 Native</h3>
+                    <p>Zero-boilerplate auto-configuration with IDE metadata. Add the starter, define your properties,
+                        and inject <code>CommerceAdapter</code>.</p>
                 </div>
                 <div class="card">
                     <h3>🔌 Extensible SPI</h3>
-                    <p>Need to support a custom legacy backend? Implement a few interfaces (<code>CatalogSPI</code>,
-                        <code>CartSPI</code>) and UCP handles the rest.
-                    </p>
+                    <p>Need to support a custom backend? Implement clean capability interfaces
+                        (<code>CatalogAdapter</code>, <code>CartAdapter</code>, <code>CheckoutAdapter</code>) and UCP
+                        handles discovery and resilience.</p>
                 </div>
                 <div class="card">
                     <h3>🛡️ Resilience Built-in</h3>
-                    <p>Production-grade by default. Circuit breakers, retries, and fallback mechanisms are baked into
-                        the core protocol adapter.</p>
+                    <p>Production-grade by default. Circuit breakers and retries via Resilience4j automatically guard
+                        every <code>CommerceAdapter</code> operation.</p>
                 </div>
             </div>
         </section>
@@ -135,11 +138,24 @@ public class ProductService {
             .orElseThrow();
     }
 }</code></pre>
+
+            <h2>Test with Any AI Agent</h2>
+            <p>Run the bundled sample storefront (<code>examples/ucp-example</code>) to test all 6 UCP capabilities over
+                MCP (<code>/ucp/mcp</code>), REST (<code>/ucp/v1</code>), and A2A
+                (<code>/.well-known/agent-card.json</code>):</p>
+            <pre><code>./gradlew -p examples/ucp-example bootRun
+claude mcp add --transport http ucp-store http://localhost:8082/ucp/mcp</code></pre>
+            <p>See the <a href="guide.html#sample-storefront" style="color: var(--accent);">User Guide</a> for full walkthroughs.</p>
         </section>
     </main>
 
     <footer>
-        <p>&copy; 2026 UCP Java. Built for developers. <a href="https://ucp.dev/latest/">Official Documentation</a></p>
+        <p>&copy; 2026 UCP Java &middot;
+            <a href="https://central.sonatype.com/artifact/dev.ucomprotocol/ucp-spring-boot-starter" target="_blank" rel="noopener noreferrer" style="color: var(--accent);">Maven Central</a> &middot;
+            <a href="https://github.com/aksharprabhudesai/universal-commerce-protocol-java" target="_blank" rel="noopener noreferrer" style="color: var(--accent);">GitHub</a> &middot;
+            <a href="https://agenticprotocols.dev/ucp.html" target="_blank" rel="noopener noreferrer" style="color: var(--accent);">Agentic Protocols</a> &middot;
+            <a href="https://ucp.dev" target="_blank" rel="noopener noreferrer" style="color: var(--accent);">UCP Specification</a>
+        </p>
     </footer>
 </body>
 

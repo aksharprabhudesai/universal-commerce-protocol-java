@@ -46,17 +46,19 @@ dependencies {
     &lt;version&gt;0.2.0&lt;/version&gt;
 &lt;/dependency&gt;</code></pre>
 
-        <h2>Example Application &amp; Testing with AI Agents</h2>
+        <h2 id="sample-storefront">Example Application &amp; Testing with AI Agents</h2>
         <p>A stateful, agent-ready storefront is available in the <code>examples/ucp-example</code> directory of the
-            repository. It implements all UCP capabilities (<code>catalog</code>, <code>cart</code>,
-            <code>checkout</code>, <code>order</code>, <code>identity_linking</code>) and exposes REST
-            (<code>/ucp/v1</code>), Model Context Protocol Streamable HTTP (<code>/ucp/mcp</code>), and an A2A Agent
-            Card (<code>/.well-known/agent-card.json</code>).
+            repository. It implements all 6 UCP capabilities (<code>catalog.search</code>, <code>catalog.lookup</code>,
+            <code>cart</code>, <code>checkout</code>, <code>order</code>, <code>identity_linking</code>) and exposes REST
+            (<code>/ucp/v1</code>), Model Context Protocol Streamable HTTP (<code>/ucp/mcp</code> with 16 tools), and an
+            A2A Agent Card (<code>/.well-known/agent-card.json</code>).
         </p>
-        <p>Start the sample storefront:</p>
+        <p>Start the sample storefront (listens on <code>http://localhost:8082</code>):</p>
         <pre><code>./gradlew -p examples/ucp-example bootRun</code></pre>
 
         <h3>Connect via MCP (Claude Code, Cursor, Claude Desktop, Gemini CLI, Antigravity)</h3>
+        <pre><code>claude mcp add --transport http ucp-store http://localhost:8082/ucp/mcp</code></pre>
+        <p>Or via <code>mcpServers</code> configuration:</p>
         <pre><code>{
   "mcpServers": {
     "ucp-store": {
@@ -108,9 +110,14 @@ public List&lt;Product&gt; search(String term) {
     return commerceAdapter.getCatalogAdapter().searchProducts(term);
 }</code></pre>
 
-        <h3>Managing Carts</h3>
+        <h3>Managing Carts &amp; Checkout</h3>
         <pre><code>public Cart createCartForUser(String userId) {
     return commerceAdapter.getCartAdapter().createCart(userId);
+}
+
+public Checkout startAndCompleteCheckout(Cart cart) {
+    Checkout session = commerceAdapter.getCheckoutAdapter().createCheckout(cart);
+    return commerceAdapter.getCheckoutAdapter().completeCheckout(session.getId());
 }</code></pre>
 
         <h2>Discovery Endpoint</h2>
@@ -188,8 +195,9 @@ ucp.services.a2a-endpoint=https://shop.example.com/.well-known/agent-card.json</
         <p>The endpoint will use the Shopify adapter to determine capabilities.</p>
 
         <h2>Custom Adapters</h2>
-        <p>To implement your own adapter, simply implement the `CommerceAdapter` interface and register it as a Spring
-            Bean. The auto-configuration will back off and use your bean instead.</p>
+        <p>To implement your own adapter, implement the <code>CommerceAdapter</code> interface and register it as a
+            Spring Bean. The auto-configuration automatically backs off from the mock adapter and wraps your bean with
+            Resilience4j circuit breaker and retry protection.</p>
 
         <pre><code>@Configuration
 public class MyCommerceConfig {
@@ -200,9 +208,10 @@ public class MyCommerceConfig {
 }</code></pre>
 
         <h3>Defining Capabilities</h3>
-        <p>The Discovery Endpoint automatically detects which capabilities your adapter supports. It does this by
-            checking which methods return `null`.</p>
-        <p>For example, if you only support the **Catalog**, you can implement your adapter like this:</p>
+        <p>The Discovery Endpoint automatically detects which capabilities your adapter supports by checking which
+            sub-adapter methods return <code>null</code> (note: <code>getCheckoutAdapter()</code> defaults to
+            <code>null</code>).</p>
+        <p>For example, if you only support the <strong>Catalog</strong>, you can implement your adapter like this:</p>
         <pre><code>public class ReadOnlyCommerceAdapter implements CommerceAdapter {
     
     @Override
@@ -240,7 +249,12 @@ public class MyCommerceConfig {
     </main>
 
     <footer>
-        <p>&copy; 2026 UCP Java. Built for developers. <a href="https://ucp.dev/latest/">Official Documentation</a></p>
+        <p>&copy; 2026 UCP Java &middot;
+            <a href="https://central.sonatype.com/artifact/dev.ucomprotocol/ucp-spring-boot-starter" target="_blank" rel="noopener noreferrer" style="color: var(--accent);">Maven Central</a> &middot;
+            <a href="https://github.com/aksharprabhudesai/universal-commerce-protocol-java" target="_blank" rel="noopener noreferrer" style="color: var(--accent);">GitHub</a> &middot;
+            <a href="https://agenticprotocols.dev/ucp.html" target="_blank" rel="noopener noreferrer" style="color: var(--accent);">Agentic Protocols</a> &middot;
+            <a href="https://ucp.dev" target="_blank" rel="noopener noreferrer" style="color: var(--accent);">UCP Specification</a>
+        </p>
     </footer>
 </body>
 
