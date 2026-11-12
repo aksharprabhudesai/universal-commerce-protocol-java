@@ -15,7 +15,9 @@ import dev.ucomprotocol.spi.OrderAdapter;
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Default in-memory mock implementation of {@link CommerceAdapter} for local
@@ -72,21 +74,29 @@ public class MockCommerceAdapter implements CommerceAdapter {
         }
     };
 
+    private final Map<String, Checkout> checkouts = new ConcurrentHashMap<>();
+
     private final CheckoutAdapter checkoutAdapter = new CheckoutAdapter() {
         @Override
         public Checkout createCheckout(Cart cart) {
-            return Checkout.builder()
-                    .id("mock-checkout-" + System.currentTimeMillis())
+            Checkout created = Checkout.builder()
+                    .id("mock-checkout-" + System.nanoTime())
                     .customerId(cart != null ? cart.getCustomerId() : null)
                     .currency(cart != null && cart.getCurrency() != null ? cart.getCurrency() : "USD")
                     .items(cart != null && cart.getItems() != null ? cart.getItems() : Collections.emptyList())
                     .totalAmount(cart != null ? cart.getTotalAmount() : BigDecimal.ZERO)
                     .status(Checkout.CheckoutStatus.READY_FOR_COMPLETE)
                     .build();
+            checkouts.put(created.getId(), created);
+            return created;
         }
 
         @Override
         public Optional<Checkout> getCheckout(String checkoutId) {
+            Checkout existing = checkouts.get(checkoutId);
+            if (existing != null) {
+                return Optional.of(existing);
+            }
             return Optional.of(Checkout.builder()
                     .id(checkoutId)
                     .currency("USD")
@@ -96,7 +106,7 @@ public class MockCommerceAdapter implements CommerceAdapter {
 
         @Override
         public Checkout updateCheckout(String checkoutId, Checkout checkout) {
-            return Checkout.builder()
+            Checkout updated = Checkout.builder()
                     .id(checkoutId)
                     .customerId(checkout != null ? checkout.getCustomerId() : null)
                     .currency(checkout != null && checkout.getCurrency() != null ? checkout.getCurrency() : "USD")
@@ -106,25 +116,39 @@ public class MockCommerceAdapter implements CommerceAdapter {
                             ? checkout.getStatus()
                             : Checkout.CheckoutStatus.READY_FOR_COMPLETE)
                     .build();
+            checkouts.put(checkoutId, updated);
+            return updated;
         }
 
         @Override
         public Checkout completeCheckout(String checkoutId) {
-            return Checkout.builder()
+            Checkout existing = checkouts.get(checkoutId);
+            Checkout completed = Checkout.builder()
                     .id(checkoutId)
-                    .currency("USD")
+                    .customerId(existing != null ? existing.getCustomerId() : null)
+                    .currency(existing != null ? existing.getCurrency() : "USD")
+                    .items(existing != null ? existing.getItems() : Collections.emptyList())
+                    .totalAmount(existing != null ? existing.getTotalAmount() : null)
                     .status(Checkout.CheckoutStatus.COMPLETED)
                     .orderId("mock-order-" + checkoutId)
                     .build();
+            checkouts.put(checkoutId, completed);
+            return completed;
         }
 
         @Override
         public Checkout cancelCheckout(String checkoutId) {
-            return Checkout.builder()
+            Checkout existing = checkouts.get(checkoutId);
+            Checkout canceled = Checkout.builder()
                     .id(checkoutId)
-                    .currency("USD")
+                    .customerId(existing != null ? existing.getCustomerId() : null)
+                    .currency(existing != null ? existing.getCurrency() : "USD")
+                    .items(existing != null ? existing.getItems() : Collections.emptyList())
+                    .totalAmount(existing != null ? existing.getTotalAmount() : null)
                     .status(Checkout.CheckoutStatus.CANCELED)
                     .build();
+            checkouts.put(checkoutId, canceled);
+            return canceled;
         }
     };
 

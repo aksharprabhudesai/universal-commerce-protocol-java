@@ -8,7 +8,7 @@ plugins {
 }
 
 group = 'dev.ucomprotocol'
-version = '0.2.0'
+version = '0.3.0'
 description = 'A unified commerce protocol library for Spring Boot'
 
 java {
