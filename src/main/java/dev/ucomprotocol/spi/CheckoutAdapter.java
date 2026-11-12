@@ -47,6 +47,22 @@ public interface CheckoutAdapter {
     Checkout completeCheckout(String checkoutId);
 
     /**
+     * Completes a checkout session with optional AP2 cryptographic mandate
+     * metadata ({@code dev.ucp.common.payment.ap2_mandate}).
+     * <p>
+     * By default, delegates to {@link #completeCheckout(String)} when not
+     * wrapped by AP2 enforcement.
+     *
+     * @param checkoutId the unique identifier of the checkout session
+     * @param ap2        the AP2 mandate payload submitted by the platform/agent,
+     *                   or {@code null}
+     * @return the completed checkout session
+     */
+    default Checkout completeCheckout(String checkoutId, Checkout.Ap2Data ap2) {
+        return completeCheckout(checkoutId);
+    }
+
+    /**
      * Cancels an active checkout session.
      *
      * @param checkoutId the unique identifier of the checkout session

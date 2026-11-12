@@ -92,7 +92,8 @@ loadScripts(document, 'script');</script>
 <div class="type-signature"><span class="modifiers">public class </span><span class="element-name type-name-label">Checkout</span>
 <span class="extends-implements">extends <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a></span></div>
 <div class="block">Represents a checkout session in the Universal Commerce Protocol
- (<code>dev.ucp.shopping.checkout</code>).</div>
+ (<code>dev.ucp.shopping.checkout</code>), optionally extended with AP2
+ cryptographic mandate metadata (<code>dev.ucp.common.payment.ap2_mandate</code>).</div>
 </section>
 <section class="summary">
 <ul class="summary-list">
@@ -105,9 +106,14 @@ loadScripts(document, 'script');</script>
 <div class="table-header col-first">Modifier and Type</div>
 <div class="table-header col-second">Class</div>
 <div class="table-header col-last">Description</div>
-<div class="col-first even-row-color"><code>static enum&nbsp;</code></div>
-<div class="col-second even-row-color"><code><a href="Checkout.CheckoutStatus.html" class="type-name-link" title="enum class in dev.ucomprotocol.model">Checkout.CheckoutStatus</a></code></div>
+<div class="col-first even-row-color"><code>static class&nbsp;</code></div>
+<div class="col-second even-row-color"><code><a href="Checkout.Ap2Data.html" class="type-name-link" title="class in dev.ucomprotocol.model">Checkout.Ap2Data</a></code></div>
 <div class="col-last even-row-color">
+<div class="block">AP2 mandate extension data (<code>dev.ucp.common.payment.ap2_mandate</code>).</div>
+</div>
+<div class="col-first odd-row-color"><code>static enum&nbsp;</code></div>
+<div class="col-second odd-row-color"><code><a href="Checkout.CheckoutStatus.html" class="type-name-link" title="enum class in dev.ucomprotocol.model">Checkout.CheckoutStatus</a></code></div>
+<div class="col-last odd-row-color">
 <div class="block">Checkout lifecycle states defined by the UCP checkout specification.</div>
 </div>
 </div>

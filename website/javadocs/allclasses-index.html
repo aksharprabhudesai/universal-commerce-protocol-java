@@ -50,11 +50,21 @@ loadScripts(document, 'script');</script>
 <h1 title="All Classes and Interfaces" class="title">All Classes and Interfaces</h1>
 </div>
 <div id="all-classes-table">
-<div class="table-tabs" role="tablist" aria-orientation="horizontal"><button id="all-classes-table-tab0" role="tab" aria-selected="true" aria-controls="all-classes-table.tabpanel" tabindex="0" onkeydown="switchTab(event)" onclick="show('all-classes-table', 'all-classes-table', 2)" class="active-table-tab">All Classes and Interfaces</button><button id="all-classes-table-tab1" role="tab" aria-selected="false" aria-controls="all-classes-table.tabpanel" tabindex="-1" onkeydown="switchTab(event)" onclick="show('all-classes-table', 'all-classes-table-tab1', 2)" class="table-tab">Interfaces</button><button id="all-classes-table-tab2" role="tab" aria-selected="false" aria-controls="all-classes-table.tabpanel" tabindex="-1" onkeydown="switchTab(event)" onclick="show('all-classes-table', 'all-classes-table-tab2', 2)" class="table-tab">Classes</button><button id="all-classes-table-tab3" role="tab" aria-selected="false" aria-controls="all-classes-table.tabpanel" tabindex="-1" onkeydown="switchTab(event)" onclick="show('all-classes-table', 'all-classes-table-tab3', 2)" class="table-tab">Enum Classes</button><button id="all-classes-table-tab4" role="tab" aria-selected="false" aria-controls="all-classes-table.tabpanel" tabindex="-1" onkeydown="switchTab(event)" onclick="show('all-classes-table', 'all-classes-table-tab4', 2)" class="table-tab">Record Classes</button></div>
+<div class="table-tabs" role="tablist" aria-orientation="horizontal"><button id="all-classes-table-tab0" role="tab" aria-selected="true" aria-controls="all-classes-table.tabpanel" tabindex="0" onkeydown="switchTab(event)" onclick="show('all-classes-table', 'all-classes-table', 2)" class="active-table-tab">All Classes and Interfaces</button><button id="all-classes-table-tab1" role="tab" aria-selected="false" aria-controls="all-classes-table.tabpanel" tabindex="-1" onkeydown="switchTab(event)" onclick="show('all-classes-table', 'all-classes-table-tab1', 2)" class="table-tab">Interfaces</button><button id="all-classes-table-tab2" role="tab" aria-selected="false" aria-controls="all-classes-table.tabpanel" tabindex="-1" onkeydown="switchTab(event)" onclick="show('all-classes-table', 'all-classes-table-tab2', 2)" class="table-tab">Classes</button><button id="all-classes-table-tab3" role="tab" aria-selected="false" aria-controls="all-classes-table.tabpanel" tabindex="-1" onkeydown="switchTab(event)" onclick="show('all-classes-table', 'all-classes-table-tab3', 2)" class="table-tab">Enum Classes</button><button id="all-classes-table-tab4" role="tab" aria-selected="false" aria-controls="all-classes-table.tabpanel" tabindex="-1" onkeydown="switchTab(event)" onclick="show('all-classes-table', 'all-classes-table-tab4', 2)" class="table-tab">Record Classes</button><button id="all-classes-table-tab5" role="tab" aria-selected="false" aria-controls="all-classes-table.tabpanel" tabindex="-1" onkeydown="switchTab(event)" onclick="show('all-classes-table', 'all-classes-table-tab5', 2)" class="table-tab">Exception Classes</button></div>
 <div id="all-classes-table.tabpanel" role="tabpanel">
 <div class="summary-table two-column-summary" aria-labelledby="all-classes-table-tab0">
 <div class="table-header col-first">Class</div>
 <div class="table-header col-last">Description</div>
+<div class="col-first even-row-color all-classes-table all-classes-table-tab3"><a href="dev/ucomprotocol/ap2/Ap2ErrorCode.html" title="enum class in dev.ucomprotocol.ap2">Ap2ErrorCode</a></div>
+<div class="col-last even-row-color all-classes-table all-classes-table-tab3">
+<div class="block">Canonical error codes defined by the UCP <code>dev.ucp.common.payment.ap2_mandate</code>
+ specification (<code>2026-08-25</code>).</div>
+</div>
+<div class="col-first odd-row-color all-classes-table all-classes-table-tab5"><a href="dev/ucomprotocol/ap2/Ap2MandateException.html" title="class in dev.ucomprotocol.ap2">Ap2MandateException</a></div>
+<div class="col-last odd-row-color all-classes-table all-classes-table-tab5">
+<div class="block">Exception raised when AP2 mandate enforcement or cryptographic verification
+ fails during checkout processing.</div>
+</div>
 <div class="col-first even-row-color all-classes-table all-classes-table-tab2"><a href="dev/ucomprotocol/model/Cart.html" title="class in dev.ucomprotocol.model">Cart</a></div>
 <div class="col-last even-row-color all-classes-table all-classes-table-tab2">
 <div class="block">Represents a shopping cart in the commerce system.</div>
@@ -74,28 +84,39 @@ loadScripts(document, 'script');</script>
 <div class="col-first even-row-color all-classes-table all-classes-table-tab2"><a href="dev/ucomprotocol/model/Checkout.html" title="class in dev.ucomprotocol.model">Checkout</a></div>
 <div class="col-last even-row-color all-classes-table all-classes-table-tab2">
 <div class="block">Represents a checkout session in the Universal Commerce Protocol
- (<code>dev.ucp.shopping.checkout</code>).</div>
+ (<code>dev.ucp.shopping.checkout</code>), optionally extended with AP2
+ cryptographic mandate metadata (<code>dev.ucp.common.payment.ap2_mandate</code>).</div>
 </div>
-<div class="col-first odd-row-color all-classes-table all-classes-table-tab3"><a href="dev/ucomprotocol/model/Checkout.CheckoutStatus.html" title="enum class in dev.ucomprotocol.model">Checkout.CheckoutStatus</a></div>
-<div class="col-last odd-row-color all-classes-table all-classes-table-tab3">
+<div class="col-first odd-row-color all-classes-table all-classes-table-tab2"><a href="dev/ucomprotocol/model/Checkout.Ap2Data.html" title="class in dev.ucomprotocol.model">Checkout.Ap2Data</a></div>
+<div class="col-last odd-row-color all-classes-table all-classes-table-tab2">
+<div class="block">AP2 mandate extension data (<code>dev.ucp.common.payment.ap2_mandate</code>).</div>
+</div>
+<div class="col-first even-row-color all-classes-table all-classes-table-tab3"><a href="dev/ucomprotocol/model/Checkout.CheckoutStatus.html" title="enum class in dev.ucomprotocol.model">Checkout.CheckoutStatus</a></div>
+<div class="col-last even-row-color all-classes-table all-classes-table-tab3">
 <div class="block">Checkout lifecycle states defined by the UCP checkout specification.</div>
 </div>
-<div class="col-first even-row-color all-classes-table all-classes-table-tab1"><a href="dev/ucomprotocol/spi/CheckoutAdapter.html" title="interface in dev.ucomprotocol.spi">CheckoutAdapter</a></div>
-<div class="col-last even-row-color all-classes-table all-classes-table-tab1">
+<div class="col-first odd-row-color all-classes-table all-classes-table-tab1"><a href="dev/ucomprotocol/spi/CheckoutAdapter.html" title="interface in dev.ucomprotocol.spi">CheckoutAdapter</a></div>
+<div class="col-last odd-row-color all-classes-table all-classes-table-tab1">
 <div class="block">Adapter interface for checkout session operations
  (<code>dev.ucp.shopping.checkout</code>).</div>
 </div>
-<div class="col-first odd-row-color all-classes-table all-classes-table-tab1"><a href="dev/ucomprotocol/spi/CommerceAdapter.html" title="interface in dev.ucomprotocol.spi">CommerceAdapter</a></div>
-<div class="col-last odd-row-color all-classes-table all-classes-table-tab1">
+<div class="col-first even-row-color all-classes-table all-classes-table-tab1"><a href="dev/ucomprotocol/spi/CommerceAdapter.html" title="interface in dev.ucomprotocol.spi">CommerceAdapter</a></div>
+<div class="col-last even-row-color all-classes-table all-classes-table-tab1">
 <div class="block">Main SPI interface for UCP adapters.</div>
 </div>
-<div class="col-first even-row-color all-classes-table all-classes-table-tab2"><a href="dev/ucomprotocol/model/Customer.html" title="class in dev.ucomprotocol.model">Customer</a></div>
-<div class="col-last even-row-color all-classes-table all-classes-table-tab2">
+<div class="col-first odd-row-color all-classes-table all-classes-table-tab2"><a href="dev/ucomprotocol/model/Customer.html" title="class in dev.ucomprotocol.model">Customer</a></div>
+<div class="col-last odd-row-color all-classes-table all-classes-table-tab2">
 <div class="block">Represents a customer in the commerce system.</div>
 </div>
-<div class="col-first odd-row-color all-classes-table all-classes-table-tab1"><a href="dev/ucomprotocol/spi/CustomerAdapter.html" title="interface in dev.ucomprotocol.spi">CustomerAdapter</a></div>
-<div class="col-last odd-row-color all-classes-table all-classes-table-tab1">
+<div class="col-first even-row-color all-classes-table all-classes-table-tab1"><a href="dev/ucomprotocol/spi/CustomerAdapter.html" title="interface in dev.ucomprotocol.spi">CustomerAdapter</a></div>
+<div class="col-last even-row-color all-classes-table all-classes-table-tab1">
 <div class="block">Adapter interface for customer management operations.</div>
+</div>
+<div class="col-first odd-row-color all-classes-table all-classes-table-tab4"><a href="dev/ucomprotocol/ap2/JwkKey.html" title="class in dev.ucomprotocol.ap2">JwkKey</a></div>
+<div class="col-last odd-row-color all-classes-table all-classes-table-tab4">
+<div class="block">Public JSON Web Key (JWK, RFC 7517) published in <code>/.well-known/ucp</code>
+ <code>keys[]</code> or configured as a trusted platform signing key for AP2
+ mandate verification.</div>
 </div>
 <div class="col-first even-row-color all-classes-table all-classes-table-tab2"><a href="dev/ucomprotocol/spi/mock/MockCommerceAdapter.html" title="class in dev.ucomprotocol.spi.mock">MockCommerceAdapter</a></div>
 <div class="col-last even-row-color all-classes-table all-classes-table-tab2">

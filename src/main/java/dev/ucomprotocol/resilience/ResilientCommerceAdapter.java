@@ -184,6 +184,11 @@ public class ResilientCommerceAdapter implements CommerceAdapter {
             }
 
             @Override
+            public Checkout completeCheckout(String checkoutId, Checkout.Ap2Data ap2) {
+                return execute(() -> raw.completeCheckout(checkoutId, ap2));
+            }
+
+            @Override
             public Checkout cancelCheckout(String checkoutId) {
                 return execute(() -> raw.cancelCheckout(checkoutId));
             }
