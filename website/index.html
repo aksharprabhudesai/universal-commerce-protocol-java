@@ -18,6 +18,7 @@
                 <a href="index.html" class="active">Home</a>
                 <a href="guide.html">User Guide</a>
                 <a href="api.html">API Reference</a>
+                <a href="blog.html">Blog</a>
                 <a href="javadocs/index.html">Javadocs</a>
                 <a href="https://github.com/aksharprabhudesai/universal-commerce-protocol-java" target="_blank"
                     rel="noopener noreferrer">GitHub</a>
@@ -27,12 +28,13 @@
 
     <main>
         <section class="hero">
+            <span class="badge">v0.2.0 &middot; UCP 2026-08-25 &middot; Spring Boot 4</span>
             <h1>Universal Commerce Protocol</h1>
-            <p class="hero-subtitle">The standard for building commerce-enabled applications. Decouple your business
+            <p class="hero-subtitle">The standard for building agent-ready commerce applications on the JVM. Decouple your business
                 logic from backend implementation details.</p>
             <div class="hero-buttons">
                 <a href="#get-started" class="cta-button">Get Started →</a>
-                <a href="guide.html" class="cta-button secondary">Read the Guide</a>
+                <a href="post-testing-with-ai-agents.html" class="cta-button secondary">Test with AI Agents</a>
                 <a href="https://github.com/aksharprabhudesai/universal-commerce-protocol-java" class="cta-button secondary"
                     target="_blank" rel="noopener noreferrer">View on GitHub</a>
             </div>
@@ -109,10 +111,16 @@
         <section class="container" id="get-started">
             <h2>Quick Install</h2>
             <p>Requires Spring Boot 4.x and Java 17+ (use <code>0.0.1</code> for Spring Boot 3.x).</p>
-            <h3>Gradle</h3>
+            <h3>Gradle (Groovy)</h3>
             <pre><code>// build.gradle
 dependencies {
     implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.2.0'
+}</code></pre>
+
+            <h3>Gradle (Kotlin DSL)</h3>
+            <pre><code>// build.gradle.kts
+dependencies {
+    implementation("dev.ucomprotocol:ucp-spring-boot-starter:0.2.0")
 }</code></pre>
 
             <h3>Maven</h3>
@@ -145,7 +153,7 @@ public class ProductService {
                 (<code>/.well-known/agent-card.json</code>):</p>
             <pre><code>./gradlew -p examples/ucp-example bootRun
 claude mcp add --transport http ucp-store http://localhost:8082/ucp/mcp</code></pre>
-            <p>See the <a href="guide.html#sample-storefront" style="color: var(--accent);">User Guide</a> for full walkthroughs.</p>
+            <p>Read the full walkthrough in <a href="post-testing-with-ai-agents.html" style="color: var(--accent);">How to Run and Test UCP Java 0.2.0 Locally with Any AI Agent</a> or see the <a href="guide.html#sample-storefront" style="color: var(--accent);">User Guide</a>.</p>
         </section>
     </main>
 

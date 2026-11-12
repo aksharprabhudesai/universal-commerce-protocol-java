@@ -18,6 +18,7 @@
                 <a href="index.html">Home</a>
                 <a href="guide.html" class="active">User Guide</a>
                 <a href="api.html">API Reference</a>
+                <a href="blog.html">Blog</a>
                 <a href="javadocs/index.html">Javadocs</a>
                 <a href="https://github.com/aksharprabhudesai/universal-commerce-protocol-java" target="_blank"
                     rel="noopener noreferrer">GitHub</a>
@@ -29,13 +30,18 @@
         <h1>User Guide</h1>
 
         <h2>Installation</h2>
-        <p>Add the starter to your project. Ensure you are using Spring Boot 4.x and Java 17+ (use version
-            <code>0.0.1</code> for Spring Boot 3.x).</p>
+        <p>Add <code>dev.ucomprotocol:ucp-spring-boot-starter:0.2.0</code> from Maven Central. Requires <strong>Spring Boot 4.x</strong> and <strong>Java 17+</strong> (use version <code>0.0.1</code> for Spring Boot 3.x).</p>
 
         <h3>Gradle (Groovy)</h3>
         <pre><code>// build.gradle
 dependencies {
     implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.2.0'
+}</code></pre>
+
+        <h3>Gradle (Kotlin DSL)</h3>
+        <pre><code>// build.gradle.kts
+dependencies {
+    implementation("dev.ucomprotocol:ucp-spring-boot-starter:0.2.0")
 }</code></pre>
 
         <h3>Maven</h3>
@@ -72,7 +78,8 @@ dependencies {
         <h3>Connect Any Autonomous HTTP / A2A Agent</h3>
         <p>Point any HTTP-capable agent at <code>http://localhost:8082/.well-known/ucp</code> or
             <code>http://localhost:8082/.well-known/agent-card.json</code> so it can dynamically discover capabilities
-            and invoke either <code>/ucp/mcp</code> or <code>/ucp/v1</code>.</p>
+            and invoke either <code>/ucp/mcp</code> or <code>/ucp/v1</code>. For a complete step-by-step walkthrough with
+            <code>curl</code> and JUnit examples, read <a href="post-testing-with-ai-agents.html" style="color: var(--accent);">How to Run and Test UCP Java 0.2.0 Locally with Any AI Agent</a>.</p>
 
         <h2>Configuration</h2>
         <p>Configure the library using standard Spring Boot properties in <code>application.properties</code> or
@@ -142,7 +149,8 @@ dependencies {
         <p>To advertise transport endpoints for the <code>dev.ucp.shopping</code> service, set any of:</p>
         <pre><code>ucp.services.rest-endpoint=https://shop.example.com/ucp/v1
 ucp.services.mcp-endpoint=https://shop.example.com/ucp/mcp
-ucp.services.a2a-endpoint=https://shop.example.com/.well-known/agent-card.json</code></pre>
+ucp.services.a2a-endpoint=https://shop.example.com/.well-known/agent-card.json
+ucp.services.embedded-enabled=true</code></pre>
 
         <h3>Verification</h3>
         <p>Once your application starts, you can verify the endpoint is active using <code>curl</code>:</p>
@@ -245,6 +253,34 @@ public class MyCommerceConfig {
     }
   }
 }</code></pre>
+
+        <h2>Resilience4j Fault Tolerance</h2>
+        <p>In <code>0.2.0</code>, <code>UcpAutoConfiguration</code> automatically wraps your active <code>CommerceAdapter</code> bean in <code>ResilientCommerceAdapter</code> whenever Resilience4j registries are present on the classpath and <code>ucp.resilience.enabled=true</code> (default). You can tune circuit breaker and retry thresholds using standard Resilience4j Spring Boot properties:</p>
+        <pre><code>ucp.resilience.enabled=true
+ucp.resilience.instance-name=ucp
+
+resilience4j.circuitbreaker.instances.ucp.slidingWindowSize=20
+resilience4j.circuitbreaker.instances.ucp.failureRateThreshold=50
+resilience4j.retry.instances.ucp.maxAttempts=3
+resilience4j.retry.instances.ucp.waitDuration=500ms</code></pre>
+
+        <h2>Changelog</h2>
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <h3>v0.2.0 (Current)</h3>
+            <ul style="margin-left: 1.25rem;">
+                <li>Added <code>Checkout</code> model and <code>CheckoutAdapter</code> SPI supporting canonical <code>dev.ucp.shopping.checkout</code> discovery.</li>
+                <li>Added <code>ResilientCommerceAdapter</code> and <code>ucp.resilience.*</code> auto-decoration with Resilience4j <code>CircuitBreaker</code> and <code>Retry</code>.</li>
+                <li>Made <code>spring-boot-starter-webmvc</code> optional (<code>compileOnly</code>) so non-web and WebFlux apps are not forced onto Servlet/Tomcat.</li>
+                <li>Added IDE configuration metadata generation, <code>ucp.services.embedded-enabled</code>, Gradle <code>9.9.1</code>, and the full multi-transport sample storefront (<code>examples/ucp-example</code>).</li>
+            </ul>
+        </div>
+        <div class="card">
+            <h3>v0.1.0 &amp; v0.0.1</h3>
+            <ul style="margin-left: 1.25rem;">
+                <li><strong>0.1.0</strong>: Upgraded to Spring Boot <code>4.1.2</code>, Resilience4j <code>2.4.0</code>, and UCP specification <code>2026-08-25</code> discovery profile schema.</li>
+                <li><strong>0.0.1</strong>: Initial release for Spring Boot 3.2 (UCP <code>2026-01-23</code>).</li>
+            </ul>
+        </div>
 
     </main>
 

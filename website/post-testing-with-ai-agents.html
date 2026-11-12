@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How to Run and Test UCP Java 0.2.0 with Any AI Agent - UCP Java</title>
+    <meta name="description" content="Step-by-step guide to running the UCP Java 0.2.0 sample storefront locally and testing discovery, catalog, cart, checkout, order, and identity capabilities with any AI agent.">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=Fira+Code&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <header>
+        <div class="nav-container">
+            <a href="index.html" class="logo">UCP Java</a>
+            <nav class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="guide.html">User Guide</a>
+                <a href="api.html">API Reference</a>
+                <a href="blog.html" class="active">Blog</a>
+                <a href="javadocs/index.html">Javadocs</a>
+                <a href="https://github.com/aksharprabhudesai/universal-commerce-protocol-java" target="_blank"
+                    rel="noopener noreferrer">GitHub</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <article class="article-content">
+            <p><a href="blog.html" style="color: var(--accent); text-decoration: none;">← Back to Blog</a></p>
+
+            <span class="badge">Testing Guide &middot; UCP Java 0.2.0</span>
+            <h1 style="font-size: 2.5rem; line-height: 1.2; margin-bottom: 1rem;">How to Run and Test UCP Java 0.2.0 Locally with Any AI Agent</h1>
+
+            <div class="post-meta">
+                <span>Published: <strong>November 11, 2026</strong></span>
+                <span>Library Version: <strong>0.2.0</strong></span>
+                <span>UCP Spec: <strong>2026-08-25</strong></span>
+                <span>Read Time: <strong>7 min</strong></span>
+            </div>
+
+            <p>With <strong>UCP Java 0.2.0</strong> (<code>dev.ucomprotocol:ucp-spring-boot-starter:0.2.0</code>), Spring Boot 4 applications gain complete Universal Commerce Protocol <code>2026-08-25</code> support—including the new <code>CheckoutAdapter</code> capability, automatic Resilience4j circuit-breaker and retry decoration, optional Web MVC auto-configuration, and multi-transport discovery at <code>/.well-known/ucp</code>.</p>
+
+            <p>To make local verification effortless, the repository includes a stateful, agent-ready reference storefront in <a href="https://github.com/aksharprabhudesai/universal-commerce-protocol-java/tree/main/examples/ucp-example" target="_blank" rel="noopener noreferrer" style="color: var(--accent);"><code>examples/ucp-example</code></a>. This post walks through every way you can run and test UCP Java locally—from automated JUnit suites and <code>curl</code> commands to live autonomous purchases with Claude Code, Cursor, Gemini CLI, or custom HTTP/A2A agents.</p>
+
+            <div class="callout">
+                <p><strong>Prerequisites:</strong> Java 17+ (the repository includes the Gradle <code>9.9.1</code> wrapper, so no separate Gradle install is needed).</p>
+            </div>
+
+            <h2>1. What the Sample Storefront Exposes</h2>
+            <p>The sample app wires an in-memory <code>CommerceAdapter</code> (<code>InMemoryStoreAdapter</code>) seeded with 6 products and demo customer <code>cust-demo-01</code> (<code>alex@example.com</code>). All operations are automatically wrapped in Resilience4j <code>CircuitBreaker</code> and <code>Retry</code> via <code>ResilientCommerceAdapter</code>.</p>
+
+            <div class="table-wrap">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Capability / Endpoint</th>
+                            <th>Path / Identifier</th>
+                            <th>What You Can Test</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>UCP Discovery</strong></td>
+                            <td><code>GET /.well-known/ucp</code></td>
+                            <td>Canonical UCP <code>2026-08-25</code> profile advertising 3 transports and 6 capabilities</td>
+                        </tr>
+                        <tr>
+                            <td><strong>MCP Streamable HTTP</strong></td>
+                            <td><code>POST /ucp/mcp</code></td>
+                            <td>JSON-RPC 2.0 MCP server exposing 16 typed shopping &amp; identity tools</td>
+                        </tr>
+                        <tr>
+                            <td><strong>REST Shopping API</strong></td>
+                            <td><code>/ucp/v1/*</code></td>
+                            <td><code>/catalog/search</code>, <code>/catalog/lookup</code>, <code>/carts</code>, <code>/checkout-sessions</code>, <code>/orders</code>, <code>/customers</code></td>
+                        </tr>
+                        <tr>
+                            <td><strong>A2A Agent Card</strong></td>
+                            <td><code>GET /.well-known/agent-card.json</code></td>
+                            <td>Agent-to-Agent discovery metadata and 5 commerce skills</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <p><strong>Seeded Catalog IDs for Testing:</strong></p>
+            <ul>
+                <li><code>prod-espresso-01</code> (<code>ESP-PRO-01</code>) — Barista Pro Espresso Machine ($499.00, <code>coffee</code>)</li>
+                <li><code>prod-grinder-02</code> (<code>GRD-BURR-02</code>) — Conical Burr Coffee Grinder ($149.00, <code>coffee</code>)</li>
+                <li><code>prod-mugs-03</code> (<code>MUG-DBL-03</code>) — Double-Wall Ceramic Espresso Cups ($34.00, <code>accessories</code>)</li>
+                <li><code>prod-kettle-04</code> (<code>KTL-GNK-04</code>) — Precision Gooseneck Pour-Over Kettle ($89.00, <code>coffee</code>)</li>
+                <li><code>prod-scale-05</code> (<code>SCL-DIG-05</code>) — Smart Digital Coffee Scale ($59.00, <code>electronics</code>)</li>
+                <li><code>prod-keyboard-06</code> (<code>KBD-MECH-06</code>) — Wireless Mechanical Developer Keyboard ($179.00, <code>electronics</code>)</li>
+            </ul>
+
+            <h2>2. Start the Storefront &amp; Run Automated Tests</h2>
+            <p>Clone the repository and run both the starter test suite and the sample storefront integration tests:</p>
+            <pre><code>git clone https://github.com/aksharprabhudesai/universal-commerce-protocol-java.git
+cd universal-commerce-protocol-java
+
+# Run starter unit &amp; auto-configuration tests (20 tests)
+./gradlew test
+
+# Run sample storefront end-to-end REST, MCP &amp; Discovery tests
+./gradlew -p examples/ucp-example test</code></pre>
+
+            <p>Now launch the live storefront server on <code>http://localhost:8082</code>:</p>
+            <pre><code>./gradlew -p examples/ucp-example bootRun</code></pre>
+
+            <p>Verify the UCP <code>2026-08-25</code> discovery document and A2A agent card in a second terminal:</p>
+            <pre><code>curl -s http://localhost:8082/.well-known/ucp | python3 -m json.tool
+curl -s http://localhost:8082/.well-known/agent-card.json | python3 -m json.tool</code></pre>
+
+            <h2>3. Test with MCP-Compatible AI Agents</h2>
+            <p>Any Model Context Protocol client that supports Streamable HTTP (Claude Code, Cursor, Claude Desktop, Gemini CLI, Antigravity) can connect directly to <code>http://localhost:8082/ucp/mcp</code>.</p>
+
+            <h3>Claude Code CLI</h3>
+            <pre><code>claude mcp add --transport http ucp-store http://localhost:8082/ucp/mcp</code></pre>
+
+            <h3>Cursor / Claude Desktop / Gemini CLI (<code>mcpServers</code> JSON)</h3>
+            <pre><code>{
+  "mcpServers": {
+    "ucp-store": {
+      "url": "http://localhost:8082/ucp/mcp"
+    }
+  }
+}</code></pre>
+
+            <h3>Sample Prompts to Try</h3>
+            <ol>
+                <li><em>"Search the UCP store for coffee gear under $200 and list what is available."</em></li>
+                <li><em>"Create a cart for customer <code>cust-demo-01</code>, add 1 conical burr grinder and 2 ceramic espresso cup sets, and tell me the live cart total."</em></li>
+                <li><em>"Create a checkout session from that cart, complete the checkout, and report the confirmed order ID and total."</em></li>
+                <li><em>"Fetch all orders placed by <code>cust-demo-01</code>, then cancel the order we just created."</em></li>
+            </ol>
+
+            <h2>4. Test with Autonomous HTTP or A2A Agents</h2>
+            <p>Agents built with LangChain, LangGraph, CrewAI, OpenAI, or Gemini that have an HTTP fetch tool can self-discover the storefront's schemas and endpoints without pre-configured MCP tools. Give your agent this prompt:</p>
+            <div class="callout">
+                <p><em>"Inspect <code>http://localhost:8082/.well-known/ucp</code> (or <code>http://localhost:8082/.well-known/agent-card.json</code>), discover the merchant's supported capabilities and transport endpoints, and purchase a wireless mechanical keyboard and smart digital coffee scale for customer <code>cust-demo-01</code>."</em></p>
+            </div>
+
+            <h2>5. Test End-to-End from Terminal with <code>curl</code></h2>
+
+            <h3>Option A: MCP JSON-RPC 2.0 Flow (<code>/ucp/mcp</code>)</h3>
+            <pre><code># 1. Initialize MCP session
+curl -s -X POST http://localhost:8082/ucp/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","clientInfo":{"name":"curl-test","version":"1.0"}}}' | python3 -m json.tool
+
+# 2. List all 16 registered UCP tools
+curl -s -X POST http://localhost:8082/ucp/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' | python3 -m json.tool
+
+# 3. Call search_catalog
+curl -s -X POST http://localhost:8082/ucp/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"search_catalog","arguments":{"category":"coffee"}}}' | python3 -m json.tool</code></pre>
+
+            <h3>Option B: Canonical REST Flow (<code>/ucp/v1</code>)</h3>
+            <pre><code># 1. Search catalog
+curl -s -X POST http://localhost:8082/ucp/v1/catalog/search \
+  -H "Content-Type: application/json" \
+  -d '{"query":"espresso"}' | python3 -m json.tool
+
+# 2. Create cart with 1 grinder ($149) + 2 cup sets ($68) = $217.00
+curl -s -X POST http://localhost:8082/ucp/v1/carts \
+  -H "Content-Type: application/json" \
+  -d '{"customerId":"cust-demo-01","items":[{"productId":"prod-grinder-02","quantity":1},{"productId":"prod-mugs-03","quantity":2}]}' | python3 -m json.tool
+
+# 3. Create checkout session (replace cart-1001 if needed)
+curl -s -X POST http://localhost:8082/ucp/v1/checkout-sessions \
+  -H "Content-Type: application/json" \
+  -d '{"cartId":"cart-1001"}' | python3 -m json.tool
+
+# 4. Complete checkout -> creates CONFIRMED order
+curl -s -X POST http://localhost:8082/ucp/v1/checkout-sessions/chk-2001/complete | python3 -m json.tool
+
+# 5. Verify placed order
+curl -s http://localhost:8082/ucp/v1/orders/ord-3001 | python3 -m json.tool</code></pre>
+
+            <h2>6. Testing UCP Java in Your Own Spring Boot 4 App</h2>
+            <p>When integrating <code>dev.ucomprotocol:ucp-spring-boot-starter:0.2.0</code> into your own service, UCP Java registers <code>MockCommerceAdapter</code> automatically whenever <code>ucp.provider=mock</code> (the default) and no custom <code>CommerceAdapter</code> bean is present—making integration testing immediate without external credentials:</p>
+
+            <pre><code>@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class StorefrontUcpDiscoveryTest {
+
+    @Autowired
+    private CommerceAdapter commerceAdapter;
+
+    @Test
+    void mockAdapterSupportsCheckoutLifecycle() {
+        Cart cart = commerceAdapter.getCartAdapter().createCart("cust-1");
+        Checkout checkout = commerceAdapter.getCheckoutAdapter().createCheckout(cart);
+        Checkout completed = commerceAdapter.getCheckoutAdapter().completeCheckout(checkout.getId());
+
+        assertEquals(Checkout.CheckoutStatus.COMPLETED, completed.getStatus());
+        assertNotNull(completed.getOrderId());
+    }
+}</code></pre>
+
+            <p>Ready to wire a real commerce backend? Head over to the <a href="guide.html" style="color: var(--accent);">User Guide</a> and <a href="api.html" style="color: var(--accent);">API Reference</a> for custom adapter examples and Resilience4j configuration.</p>
+        </article>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 UCP Java &middot;
+            <a href="https://central.sonatype.com/artifact/dev.ucomprotocol/ucp-spring-boot-starter" target="_blank" rel="noopener noreferrer" style="color: var(--accent);">Maven Central</a> &middot;
+            <a href="https://github.com/aksharprabhudesai/universal-commerce-protocol-java" target="_blank" rel="noopener noreferrer" style="color: var(--accent);">GitHub</a> &middot;
+            <a href="https://agenticprotocols.dev/ucp.html" target="_blank" rel="noopener noreferrer" style="color: var(--accent);">Agentic Protocols</a> &middot;
+            <a href="https://ucp.dev" target="_blank" rel="noopener noreferrer" style="color: var(--accent);">UCP Specification</a>
+        </p>
+    </footer>
+</body>
+
+</html>
