@@ -1,5 +1,6 @@
 dev.ucomprotocol.autoconfigure
 dev.ucomprotocol.discovery
 dev.ucomprotocol.model
+dev.ucomprotocol.resilience
 dev.ucomprotocol.spi
 dev.ucomprotocol.spi.mock

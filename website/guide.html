@@ -19,6 +19,8 @@
                 <a href="guide.html" class="active">User Guide</a>
                 <a href="api.html">API Reference</a>
                 <a href="javadocs/index.html">Javadocs</a>
+                <a href="https://github.com/aksharprabhudesai/universal-commerce-protocol-java" target="_blank"
+                    rel="noopener noreferrer">GitHub</a>
             </nav>
         </div>
     </header>
@@ -27,11 +29,22 @@
         <h1>User Guide</h1>
 
         <h2>Installation</h2>
-        <p>Add the starter to your project. Ensure you are using Spring Boot 3.2+ and Java 17+.</p>
+        <p>Add the starter to your project. Ensure you are using Spring Boot 4.x and Java 17+ (use version
+            <code>0.0.1</code> for Spring Boot 3.x).</p>
+
+        <h3>Gradle (Groovy)</h3>
         <pre><code>// build.gradle
 dependencies {
-    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:1.0.0'
+    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.2.0'
 }</code></pre>
+
+        <h3>Maven</h3>
+        <pre><code>&lt;!-- pom.xml --&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;dev.ucomprotocol&lt;/groupId&gt;
+    &lt;artifactId&gt;ucp-spring-boot-starter&lt;/artifactId&gt;
+    &lt;version&gt;0.2.0&lt;/version&gt;
+&lt;/dependency&gt;</code></pre>
 
         <h2>Example Application</h2>
         <p>A fully functional example application is available in the <code>examples/ucp-example</code> directory (of
@@ -51,10 +64,21 @@ dependencies {
         <pre><code># Default to mock provider for testing
 ucp.provider=mock
 
-# Example: Shopify Configuration (Future)
+# Example: External Provider Configuration
 # ucp.provider=shopify
 # ucp.endpoint=https://my-store.myshopify.com
-# ucp.api-key=shpat_xxxxxxxx</code></pre>
+# ucp.api-key=shpat_xxxxxxxx
+# ucp.api-secret=shpss_xxxxxxxx
+
+# Optional: Advertised Transport Endpoints for Discovery (/.well-known/ucp)
+# ucp.services.rest-endpoint=https://shop.example.com/ucp/v1
+# ucp.services.mcp-endpoint=https://shop.example.com/ucp/mcp
+# ucp.services.a2a-endpoint=https://shop.example.com/.well-known/agent-card.json
+# ucp.services.embedded-enabled=true
+
+# Optional: Resilience4j Decoration (enabled by default)
+# ucp.resilience.enabled=true
+# ucp.resilience.instance-name=ucp</code></pre>
 
         <h2>Using the Adapters</h2>
         <p>Inject the <code>CommerceAdapter</code> bean into your services. This bean automatically resolves to the
@@ -79,17 +103,23 @@ public List&lt;Product&gt; search(String term) {
         </p>
 
         <h3>How to Enable</h3>
-        <p>To enable the <code>/.well-known/ucp</code> endpoint, you simply need to include the Spring Boot Web starter
-            alongside UCP Java. The library detects if you are running a web application and automatically registers the
-            controller.</p>
+        <p>To enable the <code>/.well-known/ucp</code> endpoint, you simply need to include the Spring Boot Web MVC
+            starter alongside UCP Java. The library detects if you are running a web application and automatically
+            registers the controller.</p>
         <pre><code>// build.gradle
 dependencies {
     // 1. Add UCP Java
-    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:1.0.0'
+    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.2.0'
     
-    // 2. Ensure you have the Web Starter (Discovery only works in web apps)
-    implementation 'org.springframework.boot:spring-boot-starter-web'
+    // 2. Ensure you have the Web MVC Starter (Discovery only works in web apps)
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 }</code></pre>
+
+        <h3>Advertising Services (optional)</h3>
+        <p>To advertise transport endpoints for the <code>dev.ucp.shopping</code> service, set any of:</p>
+        <pre><code>ucp.services.rest-endpoint=https://shop.example.com/ucp/v1
+ucp.services.mcp-endpoint=https://shop.example.com/ucp/mcp
+ucp.services.a2a-endpoint=https://shop.example.com/.well-known/agent-card.json</code></pre>
 
         <h3>Verification</h3>
         <p>Once your application starts, you can verify the endpoint is active using <code>curl</code>:</p>
@@ -99,23 +129,38 @@ dependencies {
         <pre><code>GET /.well-known/ucp
 {
   "ucp": {
-    "version": "2026-01-23",
-    "capabilities": [
-      {
-        "type": "dev.ucp.shopping.catalog",
-        "version": "2026-01-23", 
-        "spec": "..." 
-      },
-      { "type": "dev.ucp.shopping.cart", ... },
-      { "type": "dev.ucp.shopping.order", ... },
-      { "type": "dev.ucp.common.identity", ... }
-    ],
-    "services": []
+    "version": "2026-08-25",
+    "services": {
+      "dev.ucp.shopping": [
+        {
+          "version": "2026-08-25",
+          "spec": "https://ucp.dev/2026-08-25/specification/overview/",
+          "transport": "rest",
+          "endpoint": "https://shop.example.com/ucp/v1",
+          "schema": "https://ucp.dev/2026-08-25/services/shopping/rest.openapi.json"
+        }
+      ]
+    },
+    "capabilities": {
+      "dev.ucp.shopping.catalog.search": [
+        {
+          "version": "2026-08-25",
+          "spec": "https://ucp.dev/2026-08-25/specification/shopping/catalog/search/",
+          "schema": "https://ucp.dev/2026-08-25/schemas/shopping/catalog_search.json"
+        }
+      ],
+      "dev.ucp.shopping.catalog.lookup": [ ... ],
+      "dev.ucp.shopping.cart": [ ... ],
+      "dev.ucp.shopping.checkout": [ ... ],
+      "dev.ucp.shopping.order": [ ... ],
+      "dev.ucp.common.identity_linking": [ ... ]
+    }
   }
 }</code></pre>
         <p>This response tells you:</p>
         <ul>
-            <li><strong>Protocol Version</strong>: 2026-01-23</li>
+            <li><strong>Protocol Version</strong>: 2026-08-25</li>
+            <li><strong>Services</strong>: Transport bindings (REST, MCP, A2A) keyed by service name.</li>
             <li><strong>Capabilities</strong>: A map of supported capabilities and their details.</li>
         </ul>
 
@@ -167,14 +212,12 @@ public class MyCommerceConfig {
         <p>When you query the discovery endpoint, it will correctly report:</p>
         <pre><code>{
   "ucp": {
-    "version": "2026-01-23",
-    "capabilities": [
-      {
-        "type": "dev.ucp.shopping.catalog",
-        ...
-      }
-    ],
-    "services": []
+    "version": "2026-08-25",
+    "services": {},
+    "capabilities": {
+      "dev.ucp.shopping.catalog.search": [ { "version": "2026-08-25", ... } ],
+      "dev.ucp.shopping.catalog.lookup": [ { "version": "2026-08-25", ... } ]
+    }
   }
 }</code></pre>
 

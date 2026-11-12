@@ -19,7 +19,7 @@
                 <a href="guide.html">User Guide</a>
                 <a href="api.html">API Reference</a>
                 <a href="javadocs/index.html">Javadocs</a>
-                <a href="https://github.com/akshar100/universal-commerce-protocol-java" target="_blank"
+                <a href="https://github.com/aksharprabhudesai/universal-commerce-protocol-java" target="_blank"
                     rel="noopener noreferrer">GitHub</a>
             </nav>
         </div>
@@ -33,7 +33,7 @@
             <div class="hero-buttons">
                 <a href="#get-started" class="cta-button">Get Started →</a>
                 <a href="guide.html" class="cta-button secondary">Read the Guide</a>
-                <a href="https://github.com/akshar100/universal-commerce-protocol-java" class="cta-button secondary"
+                <a href="https://github.com/aksharprabhudesai/universal-commerce-protocol-java" class="cta-button secondary"
                     target="_blank" rel="noopener noreferrer">View on GitHub</a>
             </div>
         </section>
@@ -105,9 +105,20 @@
 
         <section class="container" id="get-started">
             <h2>Quick Install</h2>
-            <pre><code>dependencies {
-    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:1.0.0'
+            <p>Requires Spring Boot 4.x and Java 17+ (use <code>0.0.1</code> for Spring Boot 3.x).</p>
+            <h3>Gradle</h3>
+            <pre><code>// build.gradle
+dependencies {
+    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.2.0'
 }</code></pre>
+
+            <h3>Maven</h3>
+            <pre><code>&lt;!-- pom.xml --&gt;
+&lt;dependency&gt;
+    &lt;groupId&gt;dev.ucomprotocol&lt;/groupId&gt;
+    &lt;artifactId&gt;ucp-spring-boot-starter&lt;/artifactId&gt;
+    &lt;version&gt;0.2.0&lt;/version&gt;
+&lt;/dependency&gt;</code></pre>
 
             <h2>Simple Usage</h2>
             <pre><code>@Service

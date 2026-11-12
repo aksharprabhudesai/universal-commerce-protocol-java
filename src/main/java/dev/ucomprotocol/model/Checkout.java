@@ -1,0 +1,67 @@
+package dev.ucomprotocol.model;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Represents a checkout session in the Universal Commerce Protocol
+ * ({@code dev.ucp.shopping.checkout}).
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class Checkout {
+    /** Unique identifier of the checkout session. */
+    private String id;
+
+    /** ID of the customer or buyer associated with this checkout. */
+    private String customerId;
+
+    /** ISO 4217 currency code for the checkout totals. */
+    private String currency;
+
+    /** Current lifecycle state of the checkout session. */
+    private CheckoutStatus status;
+
+    /** Line items included in the checkout session. */
+    @Builder.Default
+    private List<Cart.CartItem> items = new ArrayList<>();
+
+    /** Total monetary amount of the checkout session. */
+    private BigDecimal totalAmount;
+
+    /** URL for checkout handoff and session recovery when escalation is required. */
+    private String continueUrl;
+
+    /** Expiration timestamp of the checkout session. */
+    private Instant expiresAt;
+
+    /** ID of the order created once the checkout completes. */
+    private String orderId;
+
+    /**
+     * Checkout lifecycle states defined by the UCP checkout specification.
+     */
+    public enum CheckoutStatus {
+        /** Missing required buyer, shipping, or payment information. */
+        INCOMPLETE,
+        /** Requires user interaction via {@code continueUrl}. */
+        REQUIRES_ESCALATION,
+        /** All prerequisites met and ready to be completed. */
+        READY_FOR_COMPLETE,
+        /** Completion is currently being processed. */
+        COMPLETE_IN_PROGRESS,
+        /** Checkout completed and order created. */
+        COMPLETED,
+        /** Checkout session was canceled. */
+        CANCELED
+    }
+}

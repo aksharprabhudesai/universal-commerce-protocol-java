@@ -1,7 +1,7 @@
 plugins {
     id 'java'
-    id 'org.springframework.boot' version '3.2.2'
-    id 'io.spring.dependency-management' version '1.1.4'
+    id 'org.springframework.boot' version '4.1.2'
+    id 'io.spring.dependency-management' version '1.1.7'
 }
 
 group = 'com.example'
@@ -16,8 +16,8 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.0.1' // This relies on includeBuild in settings.gradle
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.2.0' // This relies on includeBuild in settings.gradle
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 

@@ -1,22 +1,25 @@
 plugins {
     id 'java-library'
-    id 'org.springframework.boot' version '3.2.2'
-    id 'io.spring.dependency-management' version '1.1.4'
+    id 'org.springframework.boot' version '4.1.2'
+    id 'io.spring.dependency-management' version '1.1.7'
     id 'maven-publish'
     id 'signing'
-    id 'net.thebugmc.gradle.sonatype-central-portal-publisher' version '1.2.3'
+    id 'net.thebugmc.gradle.sonatype-central-portal-publisher' version '1.2.4'
 }
 
 group = 'dev.ucomprotocol'
-version = '0.0.1'
+version = '0.2.0'
 description = 'A unified commerce protocol library for Spring Boot'
 
-
-
 java {
-    sourceCompatibility = '17'
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
     withJavadocJar()
     withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
 }
 
 configurations {
@@ -30,16 +33,20 @@ repositories {
 }
 
 dependencies {
-    implementation 'org.springframework.boot:spring-boot-starter'
-    implementation 'org.springframework.boot:spring-boot-starter-web'
-    
-    // Resilience4j for circuit breaking as mentioned in README features
-    implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
-    
+    api 'org.springframework.boot:spring-boot-starter'
+    compileOnly 'org.springframework.boot:spring-boot-starter-webmvc'
+
+    // Resilience4j for built-in circuit breaking and retry decoration
+    api 'io.github.resilience4j:resilience4j-spring-boot4:2.4.0'
+
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
-    
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 tasks.named('test') {
@@ -52,81 +59,70 @@ tasks.named('bootJar') {
 
 tasks.named('jar') {
     enabled = true
+    archiveClassifier = ''
 }
 
 tasks.named('javadoc') {
     destinationDir = file("$projectDir/website/javadocs")
 }
 
+def ucpPom = {
+    name = 'Universal Commerce Protocol Java Library'
+    description = 'A unified commerce protocol library for Spring Boot.'
+    url = 'https://ucomprotocol.dev'
+    licenses {
+        license {
+            name = 'The Apache License, Version 2.0'
+            url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+        }
+    }
+    developers {
+        developer {
+            id = 'ucomprotocol'
+            name = 'Akshar'
+            email = 'akshar.iitb@gmail.com'
+        }
+    }
+    scm {
+        connection = 'scm:git:git://github.com/aksharprabhudesai/universal-commerce-protocol-java.git'
+        developerConnection = 'scm:git:ssh://git@github.com/aksharprabhudesai/universal-commerce-protocol-java.git'
+        url = 'https://github.com/aksharprabhudesai/universal-commerce-protocol-java'
+    }
+}
+
 publishing {
     publications {
         mavenJava(MavenPublication) {
             from components.java
-            
-            pom {
-                name = 'Universal Commerce Protocol Java Library'
-                description = 'A unified commerce protocol library for Spring Boot.'
-                url = 'https://ucomprotocol.dev'
-                licenses {
-                    license {
-                        name = 'The Apache License, Version 2.0'
-                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                    }
-                }
-                developers {
-                    developer {
-                        id = 'ucomprotocol'
-                        name = 'Akshar'
-                        email = 'akshar.iitb@gmail.com'
-                    }
-                }
-                scm {
-                    connection = 'scm:git:git://github.com/akshar100/universal-commerce-protocol-java.git'
-                    developerConnection = 'scm:git:ssh://git@github.com/akshar100/universal-commerce-protocol-java.git'
-                    url = 'https://github.com/akshar100/universal-commerce-protocol-java'
-                }
-            }
+            pom ucpPom
         }
     }
 }
 
 // Configures the publication created by the central-portal-publisher plugin
-publishing.publications.withType(MavenPublication) {
+publishing.publications.withType(MavenPublication).configureEach {
     if (name == 'centralPortal') {
-        pom {
-            name = 'Universal Commerce Protocol Java Library'
-            description = 'A unified commerce protocol library for Spring Boot.'
-            url = 'https://ucomprotocol.dev'
-            licenses {
-                license {
-                    name = 'The Apache License, Version 2.0'
-                    url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                }
-            }
-            developers {
-                developer {
-                    id = 'ucomprotocol'
-                    name = 'Akshar'
-                    email = 'akshar.iitb@gmail.com'
-                }
-            }
-            scm {
-                connection = 'scm:git:git://github.com/akshar100/universal-commerce-protocol-java.git'
-                developerConnection = 'scm:git:ssh://git@github.com/akshar100/universal-commerce-protocol-java.git'
-                url = 'https://github.com/akshar100/universal-commerce-protocol-java'
-            }
-        }
+        pom ucpPom
     }
 }
 
 signing {
+    def signingKey = project.findProperty("signingKey") ?: System.getenv("SIGNING_KEY")
+    def signingPassword = project.findProperty("signingPassword") ?: System.getenv("SIGNING_PASSWORD")
+    if (signingKey && signingPassword) {
+        useInMemoryPgpKeys(signingKey.toString(), signingPassword.toString())
+    } else if (project.hasProperty("signing.secretKeyRingFile") || project.hasProperty("signing.keyId")) {
+        // Standard signing using signing.keyId, signing.password, signing.secretKeyRingFile
+    } else {
+        useGpgCmd()
+    }
     if (!version.endsWith("SNAPSHOT")) {
         sign publishing.publications.mavenJava
     }
 }
 
 centralPortal {
-    username = project.findProperty("centralPortalUsername")
-    password = project.findProperty("centralPortalPassword")
-    publishingType = 'AUTOMATIC' // Automatically publish after upload
+    username = project.findProperty("centralPortalUsername") ?: System.getenv("CENTRAL_PORTAL_USERNAME")
+    password = project.findProperty("centralPortalPassword") ?: System.getenv("CENTRAL_PORTAL_PASSWORD")
+    publishingType = net.thebugmc.gradle.sonatypepublisher.PublishingType.AUTOMATIC // Automatically publish after upload
 }

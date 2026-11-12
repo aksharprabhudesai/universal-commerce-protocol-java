@@ -1,20 +1,19 @@
 package dev.ucomprotocol.discovery;
 
+import dev.ucomprotocol.autoconfigure.UcpAutoConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.Import;
-import dev.ucomprotocol.autoconfigure.UcpAutoConfiguration;
-
-@SpringBootTest
+@SpringBootTest(properties = "ucp.services.rest-endpoint=https://shop.example.com/ucp/v1")
 @AutoConfigureMockMvc
 public class UcpDiscoveryControllerTest {
 
@@ -30,9 +29,18 @@ public class UcpDiscoveryControllerTest {
     public void shouldReturnDiscoveryInfo() throws Exception {
         mockMvc.perform(get("/.well-known/ucp"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ucp.version").value("2026-01-23"))
-                .andExpect(jsonPath("$.ucp.capabilities").isArray())
-                .andExpect(jsonPath("$.ucp.capabilities[?(@.type == 'dev.ucp.shopping.catalog')]").exists())
-                .andExpect(jsonPath("$.ucp.capabilities[?(@.type == 'dev.ucp.shopping.cart')]").exists());
+                .andExpect(jsonPath("$.ucp.version").value("2026-08-25"))
+                .andExpect(jsonPath("$.ucp.capabilities").isMap())
+                .andExpect(jsonPath("$.ucp.capabilities['dev.ucp.shopping.catalog.search'][0].version")
+                        .value("2026-08-25"))
+                .andExpect(jsonPath("$.ucp.capabilities['dev.ucp.shopping.cart'][0].schema")
+                        .value("https://ucp.dev/2026-08-25/schemas/shopping/cart.json"))
+                .andExpect(jsonPath("$.ucp.capabilities['dev.ucp.shopping.checkout'][0].schema")
+                        .value("https://ucp.dev/2026-08-25/schemas/shopping/checkout.json"))
+                .andExpect(jsonPath("$.ucp.capabilities['dev.ucp.shopping.order']").isArray())
+                .andExpect(jsonPath("$.ucp.capabilities['dev.ucp.common.identity_linking']").isArray())
+                .andExpect(jsonPath("$.ucp.services['dev.ucp.shopping'][0].transport").value("rest"))
+                .andExpect(jsonPath("$.ucp.services['dev.ucp.shopping'][0].endpoint")
+                        .value("https://shop.example.com/ucp/v1"));
     }
 }

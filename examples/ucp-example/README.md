@@ -23,44 +23,66 @@ This project is configured as a composite build, including the root `universal-c
    ../../gradlew bootRun
    ```
 
-   The application will start on port **8081**.
+   The application will start on port **8082**.
 
 ## Verify the Application
 
 Once the application is running, you can access the UCP Discovery endpoint:
 
 ```bash
-curl http://localhost:8081/.well-known/ucp
+curl http://localhost:8082/.well-known/ucp
 ```
 
 Expected output (JSON):
 ```json
 {
   "ucp": {
-    "version": "2026-01-23",
-    "capabilities": [
-      {
-        "type": "dev.ucp.shopping.catalog",
-        "version": "2026-01-23",
-        "spec": "https://ucp.dev/specification/catalog"
-      },
-      {
-        "type": "dev.ucp.shopping.cart",
-        "version": "2026-01-23",
-        "spec": "https://ucp.dev/specification/cart"
-      },
-      {
-        "type": "dev.ucp.shopping.order",
-        "version": "2026-01-23",
-        "spec": "https://ucp.dev/specification/order"
-      },
-      {
-        "type": "dev.ucp.common.identity",
-        "version": "2026-01-23",
-        "spec": "https://ucp.dev/specification/identity"
-      }
-    ],
-    "services": []
+    "version": "2026-08-25",
+    "services": {},
+    "capabilities": {
+      "dev.ucp.shopping.catalog.search": [
+        {
+          "version": "2026-08-25",
+          "spec": "https://ucp.dev/2026-08-25/specification/shopping/catalog/search/",
+          "schema": "https://ucp.dev/2026-08-25/schemas/shopping/catalog_search.json"
+        }
+      ],
+      "dev.ucp.shopping.catalog.lookup": [
+        {
+          "version": "2026-08-25",
+          "spec": "https://ucp.dev/2026-08-25/specification/shopping/catalog/lookup/",
+          "schema": "https://ucp.dev/2026-08-25/schemas/shopping/catalog_lookup.json"
+        }
+      ],
+      "dev.ucp.shopping.cart": [
+        {
+          "version": "2026-08-25",
+          "spec": "https://ucp.dev/2026-08-25/specification/shopping/cart/",
+          "schema": "https://ucp.dev/2026-08-25/schemas/shopping/cart.json"
+        }
+      ],
+      "dev.ucp.shopping.checkout": [
+        {
+          "version": "2026-08-25",
+          "spec": "https://ucp.dev/2026-08-25/specification/shopping/checkout/",
+          "schema": "https://ucp.dev/2026-08-25/schemas/shopping/checkout.json"
+        }
+      ],
+      "dev.ucp.shopping.order": [
+        {
+          "version": "2026-08-25",
+          "spec": "https://ucp.dev/2026-08-25/specification/shopping/order/",
+          "schema": "https://ucp.dev/2026-08-25/schemas/shopping/order.json"
+        }
+      ],
+      "dev.ucp.common.identity_linking": [
+        {
+          "version": "2026-08-25",
+          "spec": "https://ucp.dev/2026-08-25/specification/common/identity-linking/",
+          "schema": "https://ucp.dev/2026-08-25/schemas/common/identity_linking.json"
+        }
+      ]
+    }
   }
 }
 ```
@@ -72,7 +94,7 @@ The capabilities listed depend on what the Mock Adapter is configured to support
 The application is configured in `src/main/resources/application.properties`:
 
 ```properties
-server.port=8081
+server.port=8082
 ucp.provider=mock
 ```
 

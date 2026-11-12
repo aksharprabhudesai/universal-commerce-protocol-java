@@ -19,48 +19,98 @@
                 <a href="guide.html">User Guide</a>
                 <a href="api.html" class="active">API Reference</a>
                 <a href="javadocs/index.html">Javadocs</a>
+                <a href="https://github.com/aksharprabhudesai/universal-commerce-protocol-java" target="_blank"
+                    rel="noopener noreferrer">GitHub</a>
             </nav>
         </div>
     </header>
 
     <main class="container">
         <h1>API Reference</h1>
+        <p>Reference documentation for SPI adapters, resilience decorators, domain models, configuration properties, and discovery metadata.</p>
 
         <h2>Core Interface: <code>CommerceAdapter</code></h2>
-        <p>The root interface for all commerce operations.</p>
+        <p>The root Service Provider Interface (SPI) for all commerce capabilities. Implementations wire this interface to communicate with specific commerce backends.</p>
         <div class="card">
             <h3>Methods</h3>
             <ul>
-                <li><code>getCatalogAdapter()</code>: Access product catalog operations.</li>
-                <li><code>getCartAdapter()</code>: Access shopping cart operations.</li>
-                <li><code>getOrderAdapter()</code>: Access order management operations.</li>
-                <li><code>getCustomerAdapter()</code>: Access customer management operations.</li>
+                <li><code>CatalogAdapter getCatalogAdapter()</code>: Returns the adapter for catalog search and lookup (or <code>null</code> if unsupported).</li>
+                <li><code>CartAdapter getCartAdapter()</code>: Returns the adapter for shopping cart operations (or <code>null</code> if unsupported).</li>
+                <li><code>default CheckoutAdapter getCheckoutAdapter()</code>: Returns the adapter for checkout session operations (defaults to <code>null</code> if unsupported).</li>
+                <li><code>OrderAdapter getOrderAdapter()</code>: Returns the adapter for order management operations (or <code>null</code> if unsupported).</li>
+                <li><code>CustomerAdapter getCustomerAdapter()</code>: Returns the adapter for customer / identity operations (or <code>null</code> if unsupported).</li>
             </ul>
         </div>
 
-        <h2>Capability: <code>CatalogAdapter</code></h2>
+        <h2>Capability Adapters</h2>
+
         <div class="card">
-            <h3>Key Methods</h3>
+            <h3><code>CatalogAdapter</code></h3>
+            <p>Advertised as <code>dev.ucp.shopping.catalog.search</code> and <code>dev.ucp.shopping.catalog.lookup</code> in discovery.</p>
             <ul>
-                <li><code>Optional&lt;Product&gt; getProductById(String id)</code></li>
-                <li><code>List&lt;Product&gt; searchProducts(String query)</code></li>
-                <li><code>List&lt;Product&gt; getProductsByCategory(String categoryId)</code></li>
+                <li><code>Optional&lt;Product&gt; getProductById(String id)</code>: Fetch a single product by ID.</li>
+                <li><code>List&lt;Product&gt; searchProducts(String query)</code>: Search products by keyword query.</li>
+                <li><code>List&lt;Product&gt; getProductsByCategory(String categoryId)</code>: Retrieve products in a category.</li>
             </ul>
         </div>
 
-        <h2>Capability: <code>CartAdapter</code></h2>
         <div class="card">
-            <h3>Key Methods</h3>
+            <h3><code>CartAdapter</code></h3>
+            <p>Advertised as <code>dev.ucp.shopping.cart</code> in discovery.</p>
             <ul>
-                <li><code>Cart createCart(String customerId)</code></li>
-                <li><code>Cart addToCart(String cartId, String productId, int quantity)</code></li>
-                <li><code>Cart removeFromCart(String cartId, String itemId)</code></li>
+                <li><code>Cart getCart(String cartId)</code>: Retrieve a cart by identifier.</li>
+                <li><code>Cart createCart(String customerId)</code>: Create a new cart for a customer.</li>
+                <li><code>Cart addToCart(String cartId, String productId, int quantity)</code>: Add items to an existing cart.</li>
+                <li><code>Cart removeFromCart(String cartId, String itemId)</code>: Remove an item from a cart.</li>
+                <li><code>Cart updateItemQuantity(String cartId, String itemId, int quantity)</code>: Update the quantity of an item in the cart.</li>
             </ul>
+        </div>
+
+        <div class="card">
+            <h3><code>CheckoutAdapter</code></h3>
+            <p>Advertised as <code>dev.ucp.shopping.checkout</code> in discovery.</p>
+            <ul>
+                <li><code>Checkout createCheckout(Cart cart)</code>: Initiate a checkout session from a cart.</li>
+                <li><code>Optional&lt;Checkout&gt; getCheckout(String checkoutId)</code>: Retrieve a checkout session by ID.</li>
+                <li><code>Checkout updateCheckout(String checkoutId, Checkout checkout)</code>: Update an active checkout session.</li>
+                <li><code>Checkout completeCheckout(String checkoutId)</code>: Complete checkout and finalize order placement.</li>
+                <li><code>Checkout cancelCheckout(String checkoutId)</code>: Cancel an active checkout session.</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h3><code>OrderAdapter</code></h3>
+            <p>Advertised as <code>dev.ucp.shopping.order</code> in discovery.</p>
+            <ul>
+                <li><code>Order createOrder(String cartId)</code>: Create an order from a cart identifier.</li>
+                <li><code>Order getOrder(String orderId)</code>: Retrieve order details by order ID.</li>
+                <li><code>List&lt;Order&gt; getOrdersByCustomer(String customerId)</code>: List orders placed by a customer.</li>
+                <li><code>Order cancelOrder(String orderId)</code>: Cancel an existing order.</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h3><code>CustomerAdapter</code></h3>
+            <p>Advertised as <code>dev.ucp.common.identity_linking</code> in discovery.</p>
+            <ul>
+                <li><code>Optional&lt;Customer&gt; getCustomer(String id)</code>: Retrieve customer profile by ID.</li>
+                <li><code>Customer createCustomer(Customer customer)</code>: Register or link a new customer record.</li>
+                <li><code>Customer updateCustomer(String id, Customer customer)</code>: Update an existing customer record.</li>
+            </ul>
+        </div>
+
+        <h2>Resilience</h2>
+
+        <div class="card">
+            <h3><code>ResilientCommerceAdapter</code></h3>
+            <p>Decorates any <code>CommerceAdapter</code> with a Resilience4j <code>CircuitBreaker</code> and <code>Retry</code> while preserving <code>null</code> capability semantics. Automatically applied by <code>UcpAutoConfiguration</code> when Resilience4j registries are active (controlled via <code>ucp.resilience.*</code>).</p>
         </div>
 
         <h2>Domain Models</h2>
-        <h3><code>Product</code></h3>
-        <pre><code>String id;
+
+        <div class="card">
+            <h3><code>Product</code></h3>
+            <pre><code>String id;
 String sku;
 String name;
 String description;
@@ -68,6 +118,96 @@ BigDecimal price;
 String currency;
 Map&lt;String, Object&gt; attributes;
 String imageUrl;</code></pre>
+        </div>
+
+        <div class="card">
+            <h3><code>Cart</code> &amp; <code>CartItem</code></h3>
+            <pre><code>// Cart
+String id;
+String customerId;
+String currency;
+List&lt;CartItem&gt; items;
+BigDecimal totalAmount;
+
+// CartItem
+String id;
+String productId;
+String name;
+String sku;
+int quantity;
+BigDecimal unitPrice;
+BigDecimal totalPrice;
+String imageUrl;</code></pre>
+        </div>
+
+        <div class="card">
+            <h3><code>Checkout</code> &amp; <code>CheckoutStatus</code></h3>
+            <pre><code>String id;
+String customerId;
+String currency;
+CheckoutStatus status; // INCOMPLETE, REQUIRES_ESCALATION, READY_FOR_COMPLETE, COMPLETE_IN_PROGRESS, COMPLETED, CANCELED
+List&lt;Cart.CartItem&gt; items;
+BigDecimal totalAmount;
+String continueUrl;
+Instant expiresAt;
+String orderId;</code></pre>
+        </div>
+
+        <div class="card">
+            <h3><code>Order</code>, <code>OrderItem</code> &amp; <code>OrderStatus</code></h3>
+            <pre><code>// Order
+String id;
+String externalId;
+String customerId;
+String customerEmail;
+String currency;
+OrderStatus status; // PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED, REFUNDED
+Instant createdAt;
+List&lt;OrderItem&gt; items;
+BigDecimal totalAmount;
+
+// OrderItem
+String id;
+String productId;
+String name;
+String sku;
+int quantity;
+BigDecimal unitPrice;
+BigDecimal totalPrice;</code></pre>
+        </div>
+
+        <div class="card">
+            <h3><code>Customer</code></h3>
+            <pre><code>String id;
+String externalId;
+String email;
+String firstName;
+String lastName;
+String phoneNumber;</code></pre>
+        </div>
+
+        <h2>Configuration &amp; Discovery</h2>
+
+        <div class="card">
+            <h3><code>UcpProperties</code> (prefix <code>ucp</code>)</h3>
+            <ul>
+                <li><code>ucp.provider</code>: Active commerce provider (<code>mock</code> by default, <code>shopify</code>, etc.).</li>
+                <li><code>ucp.endpoint</code>: Provider backend endpoint URL.</li>
+                <li><code>ucp.api-key</code>: Provider API key.</li>
+                <li><code>ucp.api-secret</code>: Provider API secret.</li>
+                <li><code>ucp.services.rest-endpoint</code>: Advertised REST transport endpoint for <code>dev.ucp.shopping</code>.</li>
+                <li><code>ucp.services.mcp-endpoint</code>: Advertised Model Context Protocol (MCP) transport endpoint.</li>
+                <li><code>ucp.services.a2a-endpoint</code>: Advertised Agent-to-Agent (A2A) agent card URL.</li>
+                <li><code>ucp.services.embedded-enabled</code>: Advertise the embedded OpenRPC shopping transport (<code>false</code> by default).</li>
+                <li><code>ucp.resilience.enabled</code>: Automatically wrap <code>CommerceAdapter</code> beans with Resilience4j (<code>true</code> by default).</li>
+                <li><code>ucp.resilience.instance-name</code>: Resilience4j instance name for circuit breaker and retry lookups (<code>ucp</code> by default).</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h3>Discovery Endpoint (<code>/.well-known/ucp</code>)</h3>
+            <p>Automatically exposed when Spring Boot Web MVC and a <code>CommerceAdapter</code> bean are present. Conforms to the UCP <strong>2026-08-25</strong> specification profile schema.</p>
+        </div>
 
     </main>
 

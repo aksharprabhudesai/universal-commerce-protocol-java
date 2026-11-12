@@ -1,6 +1,7 @@
 package dev.ucomprotocol.spi.mock;
 
 import dev.ucomprotocol.model.Cart;
+import dev.ucomprotocol.model.Checkout;
 import dev.ucomprotocol.model.Customer;
 import dev.ucomprotocol.model.Order;
 import dev.ucomprotocol.model.Product;
@@ -34,6 +35,21 @@ class MockCommerceAdapterTest {
         assertThat(cart).isNotNull();
         assertThat(cart.getCustomerId()).isEqualTo("cust-1");
         assertThat(cart.getId()).startsWith("mock-cart-");
+    }
+
+    @Test
+    void checkoutAdapterShouldSupportLifecycle() {
+        Cart cart = adapter.getCartAdapter().createCart("cust-1");
+        Checkout created = adapter.getCheckoutAdapter().createCheckout(cart);
+        assertThat(created.getId()).startsWith("mock-checkout-");
+        assertThat(created.getStatus()).isEqualTo(Checkout.CheckoutStatus.READY_FOR_COMPLETE);
+
+        Checkout completed = adapter.getCheckoutAdapter().completeCheckout(created.getId());
+        assertThat(completed.getStatus()).isEqualTo(Checkout.CheckoutStatus.COMPLETED);
+        assertThat(completed.getOrderId()).isNotBlank();
+
+        Checkout canceled = adapter.getCheckoutAdapter().cancelCheckout(created.getId());
+        assertThat(canceled.getStatus()).isEqualTo(Checkout.CheckoutStatus.CANCELED);
     }
 
     @Test
