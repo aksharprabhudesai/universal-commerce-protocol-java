@@ -32,7 +32,7 @@ public class A2aAgentCardController {
                 "Reference Universal Commerce Protocol (UCP " + UcpDiscoveryController.UCP_VERSION
                         + ") merchant service supporting catalog search, cart management, AP2-protected checkout sessions, order tracking, and customer identity linking.");
         card.put("url", properties.getServices().getRestEndpoint());
-        card.put("version", "0.3.0");
+        card.put("version", "0.4.0");
         card.put("protocolVersion", UcpDiscoveryController.UCP_VERSION);
         card.put("discoveryUrl", "http://localhost:8082/.well-known/ucp");
         card.put("mcpEndpoint", properties.getServices().getMcpEndpoint());

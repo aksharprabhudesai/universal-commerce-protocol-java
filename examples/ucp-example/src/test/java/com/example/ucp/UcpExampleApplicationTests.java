@@ -41,9 +41,18 @@ class UcpExampleApplicationTests {
                         .value("dev.ucp.shopping.checkout"))
                 .andExpect(jsonPath("$.ucp.capabilities['dev.ucp.shopping.order']").isArray())
                 .andExpect(jsonPath("$.ucp.capabilities['dev.ucp.common.identity_linking']").isArray())
-                .andExpect(jsonPath("$.keys[0].kid").value("storefront-ap2-2026"))
-                .andExpect(jsonPath("$.keys[0].kty").value("EC"))
-                .andExpect(jsonPath("$.keys[0].crv").value("P-256"));
+                .andExpect(jsonPath("$.ucp.payment_handlers['com.example.processor_tokenizer'][0].id")
+                        .value("processor_tokenizer"))
+                .andExpect(jsonPath("$.ucp.payment_handlers['com.example.processor_tokenizer'][0].available_instruments[0].type")
+                        .value("card"))
+                .andExpect(jsonPath("$.keys.length()").value(2))
+                .andExpect(jsonPath("$.keys[0].kid").value("storefront-wba-ed25519"))
+                .andExpect(jsonPath("$.keys[0].kty").value("OKP"))
+                .andExpect(jsonPath("$.keys[0].crv").value("Ed25519"))
+                .andExpect(jsonPath("$.keys[0].y").doesNotExist())
+                .andExpect(jsonPath("$.keys[1].kid").value("storefront-ap2-2026"))
+                .andExpect(jsonPath("$.keys[1].kty").value("EC"))
+                .andExpect(jsonPath("$.keys[1].crv").value("P-256"));
 
         mockMvc.perform(get("/.well-known/agent-card.json"))
                 .andExpect(status().isOk())
@@ -216,7 +225,9 @@ class UcpExampleApplicationTests {
         void storefrontAllowsDirectCheckoutWithoutMandateWhenAp2Disabled() throws Exception {
             disabledMockMvc.perform(get("/.well-known/ucp"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.keys").doesNotExist())
+                    .andExpect(jsonPath("$.ucp.payment_handlers").isMap())
+                    .andExpect(jsonPath("$.keys.length()").value(1))
+                    .andExpect(jsonPath("$.keys[0].kid").value("storefront-wba-ed25519"))
                     .andExpect(jsonPath("$.ucp.capabilities['dev.ucp.common.payment.ap2_mandate']").doesNotExist());
 
             MvcResult chkRes = disabledMockMvc.perform(post("/ucp/v1/checkout-sessions")

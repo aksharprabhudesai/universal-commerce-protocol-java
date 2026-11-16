@@ -106,7 +106,7 @@ public class UcpMcpController {
                 "capabilities", Map.of("tools", Map.of()),
                 "serverInfo", Map.of(
                         "name", "ucp-java-sample-store",
-                        "version", "0.3.0"),
+                        "version", "0.4.0"),
                 "instructions",
                 "Universal Commerce Protocol (UCP 2026-08-25) sample store. Search the catalog, manage carts, run checkout sessions, inspect orders, and manage customer identities."
                         + ap2Note);
