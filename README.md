@@ -35,14 +35,14 @@ The **Universal Commerce Protocol (UCP)** library is a standardized, protocol-ag
 #### Gradle (Groovy)
 ```groovy
 dependencies {
-    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.3.0'
+    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.4.0'
 }
 ```
 
 #### Gradle (Kotlin DSL)
 ```kotlin
 dependencies {
-    implementation("dev.ucomprotocol:ucp-spring-boot-starter:0.3.0")
+    implementation("dev.ucomprotocol:ucp-spring-boot-starter:0.4.0")
 }
 ```
 
@@ -51,7 +51,7 @@ dependencies {
 <dependency>
     <groupId>dev.ucomprotocol</groupId>
     <artifactId>ucp-spring-boot-starter</artifactId>
-    <version>0.3.0</version>
+    <version>0.4.0</version>
 </dependency>
 ```
 
@@ -125,7 +125,7 @@ Include `spring-boot-starter-webmvc` alongside UCP Java:
 
 ```groovy
 dependencies {
-    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.3.0'
+    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.4.0'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 }
 ```
@@ -149,6 +149,9 @@ ucp.services.embedded-enabled=true
 | `ucp.endpoint` | - | Backend API endpoint URL for the provider. |
 | `ucp.api-key` | - | API key for authenticating with the commerce provider. |
 | `ucp.api-secret` | - | API secret or password for the commerce provider. |
+| `ucp.supported-versions` | `{}` | Map of older supported UCP protocol versions to profile URIs (`ucp.supported_versions`). |
+| `ucp.payment-handlers` | `{}` | Payment handler declarations keyed by reverse-domain name (`ucp.payment_handlers`). |
+| `ucp.keys` | `[]` | Public signing JWKs (`EC` or `OKP`/`Ed25519`) published in top-level `keys[]` at `/.well-known/ucp`. |
 | `ucp.services.rest-endpoint` | - | Advertised REST transport endpoint for `dev.ucp.shopping`. |
 | `ucp.services.mcp-endpoint` | - | Advertised Model Context Protocol (MCP) endpoint. |
 | `ucp.services.a2a-endpoint` | - | Advertised Agent-to-Agent (A2A) agent card URL. |
@@ -157,7 +160,7 @@ ucp.services.embedded-enabled=true
 | `ucp.resilience.instance-name` | `ucp` | Resilience4j `CircuitBreaker` and `Retry` instance name. |
 | `ucp.ap2.enabled` | `false` | Enable AP2 Mandates checkout signing, verification, and `/.well-known/ucp` `keys[]`. |
 | `ucp.ap2.key-id` | `merchant-ap2-key-1` | Merchant signing JWK `kid`. |
-| `ucp.ap2.algorithm` | `ES256` | JWS ECDSA curve/algorithm (`ES256`, `ES384`, `ES512`). |
+| `ucp.ap2.algorithm` | `ES256` | JWA signature algorithm (`ES256`, `ES384`, `ES512`, `EdDSA`). |
 | `ucp.ap2.signing-private-key` | - | PKCS#8 PEM or Base64 EC private key. |
 | `ucp.ap2.signing-public-key` | - | X.509 PEM or Base64 EC public key. |
 | `ucp.ap2.auto-generate-ephemeral-key` | `true` | Auto-generate an in-memory EC key pair when explicit keys are omitted. |
@@ -235,6 +238,15 @@ See [`examples/ucp-example/README.md`](examples/ucp-example/README.md) for the f
 ---
 
 ## Changelog
+
+### 0.4.0
+* **Strict UCP `2026-08-25` Business Profile Schema Compliance (`ucp.json#/$defs/business_schema`)**:
+  * Always emits required `ucp.payment_handlers` (alongside `ucp.services`) at `/.well-known/ucp`, configurable via `ucp.payment-handlers.*`.
+  * Added `ucp.supported-versions` (`ucp.supported_versions`) for advertising older protocol profile URIs.
+  * Updated discovery `Capability` to support both single-parent (`String`) and multi-parent (`List<String>`) `extends` declarations plus optional `id`, and added `id`/`config` to `Service`.
+* **`Ed25519` (`OKP` / `EdDSA`) & Open-Vocabulary Key Support**:
+  * Added RFC 8037 `OKP` (`Ed25519` / `EdDSA`) key generation, JWK serialization (omitting `y`), and mandate verification in `JwkKey` and `Ap2MandateService`, plus open-vocabulary tolerance for unrecognized key types.
+  * Added `ucp.keys.*` configuration to publish additional transport/Web Bot Auth JWKs in top-level `keys[]`.
 
 ### 0.3.0
 * Added configuration-driven **AP2 Mandates** (`dev.ucp.common.payment.ap2_mandate`) conforming to UCP `2026-08-25`:

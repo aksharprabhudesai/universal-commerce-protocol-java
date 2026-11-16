@@ -1,6 +1,6 @@
 # UCP Java Sample Storefront Application
 
-A stateful, agent-ready Spring Boot storefront built on `ucp-spring-boot-starter:0.3.0` (`UCP 2026-08-25`). It implements **all core UCP capabilities plus configuration-driven AP2 Mandates** and exposes **all three UCP network transports** so you can test end-to-end cryptographic agentic commerce locally with any AI agent or HTTP client.
+A stateful, agent-ready Spring Boot storefront built on `ucp-spring-boot-starter:0.4.0` (`UCP 2026-08-25`). It implements **all core UCP capabilities plus configuration-driven AP2 Mandates, `payment_handlers`, and dual `Ed25519` + `ES256` public `keys[]`** across **all three UCP network transports** so you can test end-to-end cryptographic agentic commerce locally with any AI agent or HTTP client.
 
 ---
 

@@ -27,7 +27,7 @@
     </header>
 
     <main class="container">
-        <span class="badge">v0.3.0 &middot; UCP 2026-08-25 &middot; AP2 Mandates</span>
+        <span class="badge">v0.4.0 &middot; UCP 2026-08-25 &middot; AP2 &amp; Ed25519</span>
         <h1>API Reference</h1>
         <p>Reference documentation for SPI adapters, AP2 cryptographic mandate services, resilience decorators, domain models, configuration properties, and discovery metadata.</p>
 
@@ -202,6 +202,9 @@ String phoneNumber;</code></pre>
             <ul>
                 <li><code>ucp.provider</code>: Active commerce provider (<code>mock</code> by default, <code>shopify</code>, etc.).</li>
                 <li><code>ucp.endpoint</code>: Provider backend endpoint URL.</li>
+                <li><code>ucp.supported-versions</code>: Map of older supported UCP protocol versions to profile URIs (<code>ucp.supported_versions</code>).</li>
+                <li><code>ucp.payment-handlers</code>: Payment handler declarations keyed by reverse-domain name (<code>ucp.payment_handlers</code>).</li>
+                <li><code>ucp.keys</code>: Public signing JWKs (<code>EC</code> or <code>OKP</code>/<code>Ed25519</code>) published in top-level <code>keys[]</code>.</li>
                 <li><code>ucp.api-key</code>: Provider API key.</li>
                 <li><code>ucp.api-secret</code>: Provider API secret.</li>
                 <li><code>ucp.services.rest-endpoint</code>: Advertised REST transport endpoint for <code>dev.ucp.shopping</code>.</li>

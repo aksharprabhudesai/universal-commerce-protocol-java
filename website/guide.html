@@ -30,18 +30,18 @@
         <h1>User Guide</h1>
 
         <h2>Installation</h2>
-        <p>Add <code>dev.ucomprotocol:ucp-spring-boot-starter:0.3.0</code> from Maven Central. Requires <strong>Spring Boot 4.x</strong> and <strong>Java 17+</strong> (use version <code>0.0.1</code> for Spring Boot 3.x).</p>
+        <p>Add <code>dev.ucomprotocol:ucp-spring-boot-starter:0.4.0</code> from Maven Central. Requires <strong>Spring Boot 4.x</strong> and <strong>Java 17+</strong> (use version <code>0.0.1</code> for Spring Boot 3.x).</p>
 
         <h3>Gradle (Groovy)</h3>
         <pre><code>// build.gradle
 dependencies {
-    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.3.0'
+    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.4.0'
 }</code></pre>
 
         <h3>Gradle (Kotlin DSL)</h3>
         <pre><code>// build.gradle.kts
 dependencies {
-    implementation("dev.ucomprotocol:ucp-spring-boot-starter:0.3.0")
+    implementation("dev.ucomprotocol:ucp-spring-boot-starter:0.4.0")
 }</code></pre>
 
         <h3>Maven</h3>
@@ -49,7 +49,7 @@ dependencies {
 &lt;dependency&gt;
     &lt;groupId&gt;dev.ucomprotocol&lt;/groupId&gt;
     &lt;artifactId&gt;ucp-spring-boot-starter&lt;/artifactId&gt;
-    &lt;version&gt;0.3.0&lt;/version&gt;
+    &lt;version&gt;0.4.0&lt;/version&gt;
 &lt;/dependency&gt;</code></pre>
 
         <h2 id="sample-storefront">Example Application &amp; Testing with AI Agents</h2>
@@ -80,7 +80,7 @@ dependencies {
         <p>Point any HTTP-capable agent at <code>http://localhost:8082/.well-known/ucp</code> or
             <code>http://localhost:8082/.well-known/agent-card.json</code> so it can dynamically discover capabilities
             and invoke either <code>/ucp/mcp</code> or <code>/ucp/v1</code>. For a complete step-by-step walkthrough with
-            <code>curl</code> and JUnit examples, read <a href="post-testing-with-ai-agents.html" style="color: var(--accent);">How to Run and Test UCP Java 0.3.0 Locally with Any AI Agent</a>.</p>
+            <code>curl</code> and JUnit examples, read <a href="post-testing-with-ai-agents.html" style="color: var(--accent);">How to Run and Test UCP Java 0.4.0 Locally with Any AI Agent</a>.</p>
 
         <h2>Configuration</h2>
         <p>Configure the library using standard Spring Boot properties in <code>application.properties</code> or
@@ -140,7 +140,7 @@ public Checkout startAndCompleteCheckout(Cart cart) {
         <pre><code>// build.gradle
 dependencies {
     // 1. Add UCP Java
-    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.3.0'
+    implementation 'dev.ucomprotocol:ucp-spring-boot-starter:0.4.0'
     
     // 2. Ensure you have the Web MVC Starter (Discovery only works in web apps)
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
@@ -279,7 +279,14 @@ ucp.ap2.require-checkout-mandate=true
 
         <h2>Changelog</h2>
         <div class="card" style="margin-bottom: 1.5rem;">
-            <h3>v0.3.0 (Current)</h3>
+            <h3>v0.4.0 (Current)</h3>
+            <ul style="margin-left: 1.25rem;">
+                <li>Strict UCP <code>2026-08-25</code> Business Profile schema compliance: always emits required <code>ucp.payment_handlers</code> alongside <code>ucp.services</code>, adds <code>ucp.supported-versions</code>, and supports multi-parent <code>extends</code> arrays on <code>Capability</code>.</li>
+                <li>Added RFC 8037 <code>OKP</code> (<code>Ed25519</code> / <code>EdDSA</code>) public JWK serialization, mandate verification, open-vocabulary key tolerance, and <code>ucp.keys.*</code> configuration.</li>
+            </ul>
+        </div>
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <h3>v0.3.0</h3>
             <ul style="margin-left: 1.25rem;">
                 <li>Added configuration-driven <strong>AP2 Mandates</strong> (<code>dev.ucp.common.payment.ap2_mandate</code>): <code>Ap2MandateService</code>, <code>Ap2CommerceAdapter</code>, RFC 8785 <code>JcsCanonicalizer</code>, <code>JwkKey</code>, and <code>ucp.ap2.*</code> properties.</li>
                 <li>Updated <code>UcpDiscoveryController</code> to advertise <code>dev.ucp.common.payment.ap2_mandate</code> and top-level <code>keys[]</code> when AP2 is enabled.</li>
