@@ -13,10 +13,15 @@ import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -135,6 +140,51 @@ class Ap2MandateServiceTest {
                 () -> ap2Service.verifyCheckoutMandate(checkout,
                         Checkout.Ap2Data.builder().checkoutMandate(mandate).build()));
         assertEquals(Ap2ErrorCode.MANDATE_SCOPE_MISMATCH, ex.getErrorCode());
+    }
+
+    @Test
+    void supportsEd25519OkpJwkSerializationAndMandateVerification() throws Exception {
+        KeyPair edAgent = Ap2MandateService.generateEd25519KeyPair();
+        JwkKey okpJwk = Ap2MandateService.toPublicJwk(edAgent.getPublic(), "wba-agent-ed25519", "EdDSA");
+
+        assertEquals("OKP", okpJwk.kty());
+        assertEquals("Ed25519", okpJwk.crv());
+        assertEquals("EdDSA", okpJwk.alg());
+        assertNull(okpJwk.y());
+
+        // Verify RFC 8037 raw 32-byte little-endian encoding matches X.509 SubjectPublicKeyInfo tail
+        byte[] x509 = edAgent.getPublic().getEncoded();
+        byte[] expectedRaw32 = Arrays.copyOfRange(x509, x509.length - 32, x509.length);
+        assertArrayEquals(expectedRaw32, Base64.getUrlDecoder().decode(okpJwk.x()));
+
+        // Verify JSON serialization omits 'y'
+        JsonMapper mapper = JsonMapper.builder().build();
+        String json = mapper.writeValueAsString(okpJwk);
+        assertFalse(json.contains("\"y\""));
+
+        // Register OKP key + unknown open-vocabulary key and verify EdDSA mandate end-to-end
+        JwkKey unknownFutureKey = new JwkKey("future-key-1", "AKP", "ML-DSA-65", "AAAA", null, "sig", "ML-DSA-65");
+        Ap2MandateService serviceWithOkp = new Ap2MandateService(
+                "merchant-key-2026",
+                "ES256",
+                merchantKeys.getPrivate(),
+                merchantKeys.getPublic(),
+                true,
+                true,
+                false,
+                List.of(okpJwk, unknownFutureKey));
+
+        Checkout checkout = serviceWithOkp.signCheckout(sampleCheckout());
+        String edMandate = serviceWithOkp.mintCheckoutMandate(
+                checkout,
+                edAgent.getPrivate(),
+                edAgent.getPublic(),
+                "wba-agent-ed25519",
+                Duration.ofMinutes(5));
+
+        serviceWithOkp.verifyCheckoutMandate(
+                checkout,
+                Checkout.Ap2Data.builder().checkoutMandate(edMandate).build());
     }
 
     private Checkout sampleCheckout() {

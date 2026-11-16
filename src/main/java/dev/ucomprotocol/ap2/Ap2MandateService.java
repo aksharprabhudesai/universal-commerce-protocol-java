@@ -2,11 +2,12 @@ package dev.ucomprotocol.ap2;
 
 import dev.ucomprotocol.model.Cart;
 import dev.ucomprotocol.model.Checkout;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.AlgorithmParameters;
@@ -20,10 +21,15 @@ import java.security.PublicKey;
 import java.security.Signature;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
+import java.security.interfaces.EdECPrivateKey;
+import java.security.interfaces.EdECPublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.ECParameterSpec;
 import java.security.spec.ECPoint;
 import java.security.spec.ECPublicKeySpec;
+import java.security.spec.EdECPoint;
+import java.security.spec.EdECPublicKeySpec;
+import java.security.spec.NamedParameterSpec;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.time.Duration;
@@ -38,37 +44,39 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Cryptographic service implementing the UCP {@code 2026-08-25} AP2 Mandates
- * extension ({@code dev.ucp.common.payment.ap2_mandate}).
+ * extension ({@code dev.ucp.common.payment.ap2_mandate}) and UCP public key
+ * discovery ({@code EC} P-256/P-384/P-521 and {@code OKP} Ed25519).
  * <p>
  * Responsibilities:
  * <ul>
- * <li>Exporting the merchant's public signing key as an RFC 7517 {@link JwkKey}
- * for {@code /.well-known/ucp} {@code keys[]}.</li>
+ * <li>Exporting the merchant's public signing key as an RFC 7517 / RFC 8037
+ * {@link JwkKey} for {@code /.well-known/ucp} {@code keys[]}.</li>
  * <li>Signing {@link Checkout} payloads using RFC 8785 JCS and detached JWS
  * ({@code ap2.merchant_authorization}).</li>
  * <li>Verifying incoming {@code SD-JWT+kb} {@code ap2.checkout_mandate}
  * credentials, expiration, embedded merchant authorization, and checkout scope
- * consistency.</li>
+ * consistency across {@code ES256}, {@code ES384}, {@code ES512}, and
+ * {@code EdDSA} ({@code Ed25519}).</li>
  * </ul>
  */
 public class Ap2MandateService {
 
+    private static final Logger logger = LoggerFactory.getLogger(Ap2MandateService.class);
     private static final Base64.Encoder B64_URL_ENC = Base64.getUrlEncoder().withoutPadding();
     private static final Base64.Decoder B64_URL_DEC = Base64.getUrlDecoder();
 
     private final String keyId;
     private final String algorithm;
-    private final ECPrivateKey merchantPrivateKey;
-    private final ECPublicKey merchantPublicKey;
+    private final PrivateKey merchantPrivateKey;
+    private final PublicKey merchantPublicKey;
     private final boolean requireCheckoutMandate;
     private final boolean verifyMandateSignature;
     private final boolean allowEmbeddedAgentJwk;
-    private final Map<String, ECPublicKey> trustedPlatformKeys = new ConcurrentHashMap<>();
+    private final Map<String, PublicKey> trustedPlatformKeys = new ConcurrentHashMap<>();
     private final JsonMapper jsonMapper;
 
     /**
-     * Creates an {@link Ap2MandateService} with explicit key material and policy
-     * flags.
+     * Creates an {@link Ap2MandateService} with EC key material and policy flags.
      *
      * @param keyId                  merchant JWK {@code kid}
      * @param algorithm              JWS ECDSA algorithm ({@code ES256},
@@ -93,6 +101,38 @@ public class Ap2MandateService {
             boolean verifyMandateSignature,
             boolean allowEmbeddedAgentJwk,
             List<JwkKey> trustedKeys) {
+        this(keyId, algorithm, (PrivateKey) merchantPrivateKey, (PublicKey) merchantPublicKey,
+                requireCheckoutMandate, verifyMandateSignature, allowEmbeddedAgentJwk, trustedKeys);
+    }
+
+    /**
+     * Creates an {@link Ap2MandateService} with generic key material ({@code EC}
+     * or {@code Ed25519}) and policy flags.
+     *
+     * @param keyId                  merchant JWK {@code kid}
+     * @param algorithm              JWA signature algorithm ({@code ES256},
+     *                               {@code ES384}, {@code ES512}, or {@code EdDSA})
+     * @param merchantPrivateKey     merchant private key ({@link ECPrivateKey} or
+     *                               {@link EdECPrivateKey})
+     * @param merchantPublicKey      merchant public key ({@link ECPublicKey} or
+     *                               {@link EdECPublicKey})
+     * @param requireCheckoutMandate whether {@code completeCheckout} requires
+     *                               {@code ap2.checkout_mandate}
+     * @param verifyMandateSignature whether to cryptographically verify mandate
+     *                               signatures
+     * @param allowEmbeddedAgentJwk  whether to accept self-contained agent JWKs in
+     *                               mandate headers or {@code cnf.jwk} claims
+     * @param trustedKeys            pre-configured trusted platform public JWKs
+     */
+    public Ap2MandateService(
+            String keyId,
+            String algorithm,
+            PrivateKey merchantPrivateKey,
+            PublicKey merchantPublicKey,
+            boolean requireCheckoutMandate,
+            boolean verifyMandateSignature,
+            boolean allowEmbeddedAgentJwk,
+            List<JwkKey> trustedKeys) {
         this.keyId = Objects.requireNonNull(keyId, "keyId must not be null");
         this.algorithm = normalizeAlgorithm(algorithm);
         this.merchantPrivateKey = Objects.requireNonNull(merchantPrivateKey, "merchantPrivateKey must not be null");
@@ -105,17 +145,43 @@ public class Ap2MandateService {
         if (trustedKeys != null) {
             for (JwkKey jwk : trustedKeys) {
                 if (jwk != null && jwk.kid() != null) {
-                    this.trustedPlatformKeys.put(jwk.kid(), parseEcPublicKeyFromJwk(jwk));
+                    try {
+                        this.trustedPlatformKeys.put(jwk.kid(), parsePublicKeyFromJwk(jwk));
+                    } catch (Ap2MandateException ex) {
+                        // Per UCP 2026-08-25 Signatures spec, kty/crv/alg vocabularies are open:
+                        // verifiers MUST NOT reject a published key set due to an unsupported key.
+                        logger.warn("Skipping unsupported JWK (kid={}, kty={}, crv={}, alg={}): {}",
+                                jwk.kid(), jwk.kty(), jwk.crv(), jwk.alg(), ex.getMessage());
+                    }
                 }
             }
         }
     }
 
     /**
+     * Generates a fresh key pair matching the specified JWA algorithm
+     * ({@code ES256}, {@code ES384}, {@code ES512}, or {@code EdDSA}).
+     *
+     * @param algorithm JWA algorithm name
+     * @return generated {@link KeyPair}
+     */
+    public static KeyPair generateKeyPair(String algorithm) {
+        String normalized = normalizeAlgorithm(algorithm);
+        if ("EDDSA".equals(normalized) || "EdDSA".equals(normalized)) {
+            try {
+                return KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+            } catch (GeneralSecurityException e) {
+                throw new IllegalStateException("Failed to generate Ed25519 key pair", e);
+            }
+        }
+        return generateEcKeyPair(normalized);
+    }
+
+    /**
      * Generates a fresh EC key pair matching the specified JWS algorithm
      * ({@code ES256}, {@code ES384}, or {@code ES512}).
      *
-     * @param algorithm JWS algorithm name
+     * @param algorithm JWS ECDSA algorithm name
      * @return generated EC {@link KeyPair}
      */
     public static KeyPair generateEcKeyPair(String algorithm) {
@@ -129,23 +195,60 @@ public class Ap2MandateService {
     }
 
     /**
+     * Generates a fresh Ed25519 ({@code OKP} / {@code EdDSA}) key pair.
+     *
+     * @return generated Ed25519 {@link KeyPair}
+     */
+    public static KeyPair generateEd25519KeyPair() {
+        return generateKeyPair("EdDSA");
+    }
+
+    /**
+     * Parses a PKCS#8 PEM or Base64-encoded private key ({@code EC} or
+     * {@code Ed25519}) for the given JWA algorithm.
+     *
+     * @param pemOrBase64 PKCS#8 private key text
+     * @param algorithm   JWA algorithm ({@code ES256}, {@code ES384}, {@code ES512}, or {@code EdDSA})
+     * @return parsed {@link PrivateKey}
+     */
+    public static PrivateKey parseSigningPrivateKey(String pemOrBase64, String algorithm) {
+        String normalized = normalizeAlgorithm(algorithm);
+        byte[] der = decodePemOrBase64(pemOrBase64, "PRIVATE KEY");
+        try {
+            String kfAlg = "EdDSA".equals(normalized) ? "Ed25519" : "EC";
+            return KeyFactory.getInstance(kfAlg).generatePrivate(new PKCS8EncodedKeySpec(der));
+        } catch (GeneralSecurityException e) {
+            throw new IllegalArgumentException("Invalid PKCS#8 private key configuration for " + normalized, e);
+        }
+    }
+
+    /**
+     * Parses an X.509 PEM or Base64-encoded public key ({@code EC} or
+     * {@code Ed25519}) for the given JWA algorithm.
+     *
+     * @param pemOrBase64 X.509 public key text
+     * @param algorithm   JWA algorithm ({@code ES256}, {@code ES384}, {@code ES512}, or {@code EdDSA})
+     * @return parsed {@link PublicKey}
+     */
+    public static PublicKey parseSigningPublicKey(String pemOrBase64, String algorithm) {
+        String normalized = normalizeAlgorithm(algorithm);
+        byte[] der = decodePemOrBase64(pemOrBase64, "PUBLIC KEY");
+        try {
+            String kfAlg = "EdDSA".equals(normalized) ? "Ed25519" : "EC";
+            return KeyFactory.getInstance(kfAlg).generatePublic(new X509EncodedKeySpec(der));
+        } catch (GeneralSecurityException e) {
+            throw new IllegalArgumentException("Invalid X.509 public key configuration for " + normalized, e);
+        }
+    }
+
+    /**
      * Parses a PKCS#8 PEM or Base64-encoded EC private key.
      *
      * @param pemOrBase64 PKCS#8 private key text
      * @return parsed {@link ECPrivateKey}
      */
     public static ECPrivateKey parsePrivateKey(String pemOrBase64) {
-        try {
-            String stripped = pemOrBase64
-                    .replace("-----BEGIN PRIVATE KEY-----", "")
-                    .replace("-----END PRIVATE KEY-----", "")
-                    .replaceAll("\\s+", "");
-            byte[] der = Base64.getDecoder().decode(stripped);
-            PrivateKey key = KeyFactory.getInstance("EC").generatePrivate(new PKCS8EncodedKeySpec(der));
-            return (ECPrivateKey) key;
-        } catch (GeneralSecurityException | IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid PKCS#8 EC private key configuration", e);
-        }
+        return (ECPrivateKey) parseSigningPrivateKey(pemOrBase64, "ES256");
     }
 
     /**
@@ -155,17 +258,7 @@ public class Ap2MandateService {
      * @return parsed {@link ECPublicKey}
      */
     public static ECPublicKey parsePublicKey(String pemOrBase64) {
-        try {
-            String stripped = pemOrBase64
-                    .replace("-----BEGIN PUBLIC KEY-----", "")
-                    .replace("-----END PUBLIC KEY-----", "")
-                    .replaceAll("\\s+", "");
-            byte[] der = Base64.getDecoder().decode(stripped);
-            PublicKey key = KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(der));
-            return (ECPublicKey) key;
-        } catch (GeneralSecurityException | IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid X.509 EC public key configuration", e);
-        }
+        return (ECPublicKey) parseSigningPublicKey(pemOrBase64, "ES256");
     }
 
     /**
@@ -183,6 +276,47 @@ public class Ap2MandateService {
         String x = B64_URL_ENC.encodeToString(toFixedUnsignedBytes(point.getAffineX(), coordBytes));
         String y = B64_URL_ENC.encodeToString(toFixedUnsignedBytes(point.getAffineY(), coordBytes));
         return new JwkKey(kid, "EC", jwkCurveName(normalizedAlg), x, y, "sig", normalizedAlg);
+    }
+
+    /**
+     * Converts a {@link PublicKey} ({@link ECPublicKey} or {@link EdECPublicKey})
+     * into an RFC 7517 / RFC 8037 public {@link JwkKey}.
+     *
+     * @param publicKey EC or Ed25519 public key
+     * @param kid       key identifier
+     * @param alg       JWA algorithm ({@code ES256}, {@code ES384}, {@code ES512}, or {@code EdDSA})
+     * @return public {@link JwkKey} record
+     */
+    public static JwkKey toPublicJwk(PublicKey publicKey, String kid, String alg) {
+        if (publicKey instanceof ECPublicKey ecKey) {
+            return toPublicJwk(ecKey, kid, alg);
+        }
+        if (publicKey instanceof EdECPublicKey edKey) {
+            byte[] raw32 = encodeEd25519PublicKeyBytes(edKey);
+            return JwkKey.ed25519(kid, B64_URL_ENC.encodeToString(raw32));
+        }
+        throw new IllegalArgumentException("Unsupported PublicKey type for JWK export: " + publicKey.getClass());
+    }
+
+    /**
+     * Reconstructs a JCA {@link PublicKey} ({@link ECPublicKey} or
+     * {@link EdECPublicKey}) from an RFC 7517 / RFC 8037 {@link JwkKey}.
+     *
+     * @param jwk public JWK ({@code EC} or {@code OKP}/{@code Ed25519})
+     * @return reconstructed {@link PublicKey}
+     */
+    public static PublicKey parsePublicKeyFromJwk(JwkKey jwk) {
+        if (jwk == null || jwk.kty() == null || jwk.x() == null) {
+            throw new Ap2MandateException(Ap2ErrorCode.AGENT_MISSING_KEY, "Invalid JWK definition");
+        }
+        if ("EC".equalsIgnoreCase(jwk.kty())) {
+            return parseEcPublicKeyFromJwk(jwk);
+        }
+        if ("OKP".equalsIgnoreCase(jwk.kty())) {
+            return parseEd25519PublicKeyFromJwk(jwk);
+        }
+        throw new Ap2MandateException(Ap2ErrorCode.AGENT_MISSING_KEY,
+                "Unsupported JWK kty: " + jwk.kty());
     }
 
     /**
@@ -207,12 +341,12 @@ public class Ap2MandateService {
     /**
      * Registers an additional trusted platform or agent public JWK at runtime.
      *
-     * @param jwk trusted public EC JWK
+     * @param jwk trusted public EC or Ed25519 JWK
      */
     public void registerTrustedPlatformKey(JwkKey jwk) {
         Objects.requireNonNull(jwk, "jwk must not be null");
         Objects.requireNonNull(jwk.kid(), "jwk.kid must not be null");
-        trustedPlatformKeys.put(jwk.kid(), parseEcPublicKeyFromJwk(jwk));
+        trustedPlatformKeys.put(jwk.kid(), parsePublicKeyFromJwk(jwk));
     }
 
     /**
@@ -343,7 +477,7 @@ public class Ap2MandateService {
                         "Mandate JWS header omits alg");
             }
             String normalizedAlg = normalizeAlgorithm(alg);
-            ECPublicKey verificationKey = resolveMandateVerificationKey(header, payload);
+            PublicKey verificationKey = resolveMandateVerificationKey(header, payload);
 
             String signingInput = jwtParts[0] + "." + jwtParts[1];
             byte[] sigBytes = decodeBase64Url(jwtParts[2], Ap2ErrorCode.MANDATE_INVALID_SIGNATURE);
@@ -367,8 +501,7 @@ public class Ap2MandateService {
 
     /**
      * Mints a spec-compliant {@code SD-JWT+kb} ({@code dc+sd-jwt}) checkout mandate
-     * over a merchant-signed {@link Checkout}. Useful for integration tests, sample
-     * storefronts, and platform/agent SDK workflows.
+     * over a merchant-signed {@link Checkout} using an EC key pair.
      *
      * @param signedCheckout  checkout carrying {@code ap2.merchant_authorization}
      * @param agentPrivateKey platform or user EC private key
@@ -383,11 +516,32 @@ public class Ap2MandateService {
             ECPublicKey agentPublicKey,
             String agentKid,
             Duration ttl) {
+        return mintCheckoutMandate(signedCheckout, (PrivateKey) agentPrivateKey, (PublicKey) agentPublicKey, agentKid, ttl);
+    }
+
+    /**
+     * Mints a spec-compliant {@code SD-JWT+kb} ({@code dc+sd-jwt}) checkout mandate
+     * over a merchant-signed {@link Checkout} using an {@code EC} or
+     * {@code Ed25519} key pair.
+     *
+     * @param signedCheckout  checkout carrying {@code ap2.merchant_authorization}
+     * @param agentPrivateKey platform or user private key ({@code EC} or {@code Ed25519})
+     * @param agentPublicKey  platform or user public key ({@code EC} or {@code Ed25519})
+     * @param agentKid        platform or user key ID
+     * @param ttl             validity duration of the mandate
+     * @return serialized {@code <issuer-jwt>~<kb-jwt>} checkout mandate string
+     */
+    public String mintCheckoutMandate(
+            Checkout signedCheckout,
+            PrivateKey agentPrivateKey,
+            PublicKey agentPublicKey,
+            String agentKid,
+            Duration ttl) {
         Objects.requireNonNull(signedCheckout, "signedCheckout must not be null");
         JsonNode checkoutNode = jsonMapper.valueToTree(signedCheckout);
         verifyMerchantAuthorization(checkoutNode);
 
-        String alg = curveAlgorithmForKey(agentPublicKey);
+        String alg = algorithmForPublicKey(agentPublicKey);
         JwkKey agentJwk = toPublicJwk(agentPublicKey, agentKid, alg);
         long now = Instant.now().getEpochSecond();
         long exp = now + (ttl != null ? ttl.toSeconds() : 300L);
@@ -441,7 +595,7 @@ public class Ap2MandateService {
             return;
         }
         JwkKey holderJwk = jsonMapper.treeToValue(cnfJwkNode, JwkKey.class);
-        ECPublicKey holderKey = parseEcPublicKeyFromJwk(holderJwk);
+        PublicKey holderKey = parsePublicKeyFromJwk(holderJwk);
         String kbSigningInput = kbParts[0] + "." + kbParts[1];
         byte[] kbSig = decodeBase64Url(kbParts[2], Ap2ErrorCode.MANDATE_INVALID_SIGNATURE);
         if (!verifyBytes(kbSigningInput.getBytes(StandardCharsets.US_ASCII), kbSig, holderKey, alg)) {
@@ -450,7 +604,7 @@ public class Ap2MandateService {
         }
     }
 
-    private ECPublicKey resolveMandateVerificationKey(JsonNode header, JsonNode payload) {
+    private PublicKey resolveMandateVerificationKey(JsonNode header, JsonNode payload) {
         String kid = textField(header, "kid");
         if (kid != null && trustedPlatformKeys.containsKey(kid)) {
             return trustedPlatformKeys.get(kid);
@@ -458,11 +612,11 @@ public class Ap2MandateService {
         if (allowEmbeddedAgentJwk) {
             JsonNode headerJwk = header.get("jwk");
             if (headerJwk != null && headerJwk.isObject()) {
-                return parseEcPublicKeyFromJwk(jsonMapper.treeToValue(headerJwk, JwkKey.class));
+                return parsePublicKeyFromJwk(jsonMapper.treeToValue(headerJwk, JwkKey.class));
             }
             JsonNode cnfJwk = payload.path("cnf").path("jwk");
             if (cnfJwk != null && cnfJwk.isObject()) {
-                return parseEcPublicKeyFromJwk(jsonMapper.treeToValue(cnfJwk, JwkKey.class));
+                return parsePublicKeyFromJwk(jsonMapper.treeToValue(cnfJwk, JwkKey.class));
             }
         }
         throw new Ap2MandateException(Ap2ErrorCode.AGENT_MISSING_KEY,
@@ -512,7 +666,7 @@ public class Ap2MandateService {
         }
     }
 
-    private String signCompactJwt(JsonNode header, JsonNode payload, ECPrivateKey privateKey, String alg) {
+    private String signCompactJwt(JsonNode header, JsonNode payload, PrivateKey privateKey, String alg) {
         String h = B64_URL_ENC.encodeToString(JcsCanonicalizer.canonicalize(header));
         String p = B64_URL_ENC.encodeToString(JcsCanonicalizer.canonicalize(payload));
         String input = h + "." + p;
@@ -531,6 +685,18 @@ public class Ap2MandateService {
         }
     }
 
+    private static byte[] decodePemOrBase64(String pemOrBase64, String label) {
+        try {
+            String stripped = pemOrBase64
+                    .replace("-----BEGIN " + label + "-----", "")
+                    .replace("-----END " + label + "-----", "")
+                    .replaceAll("\\s+", "");
+            return Base64.getDecoder().decode(stripped);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid Base64 key encoding", e);
+        }
+    }
+
     private static byte[] decodeBase64Url(String part, Ap2ErrorCode errorCode) {
         try {
             return B64_URL_DEC.decode(part);
@@ -546,18 +712,18 @@ public class Ap2MandateService {
         return node.get(field).asString();
     }
 
-    private static byte[] signBytes(byte[] data, ECPrivateKey privateKey, String alg) {
+    private static byte[] signBytes(byte[] data, PrivateKey privateKey, String alg) {
         try {
             Signature signature = Signature.getInstance(jcaSignatureAlgorithm(alg));
             signature.initSign(privateKey);
             signature.update(data);
             return signature.sign();
         } catch (GeneralSecurityException e) {
-            throw new IllegalStateException("Failed to compute AP2 ECDSA signature", e);
+            throw new IllegalStateException("Failed to compute AP2 signature (" + alg + ")", e);
         }
     }
 
-    private static boolean verifyBytes(byte[] data, byte[] sigBytes, ECPublicKey publicKey, String alg) {
+    private static boolean verifyBytes(byte[] data, byte[] sigBytes, PublicKey publicKey, String alg) {
         try {
             Signature signature = Signature.getInstance(jcaSignatureAlgorithm(alg));
             signature.initVerify(publicKey);
@@ -569,8 +735,8 @@ public class Ap2MandateService {
     }
 
     private static ECPublicKey parseEcPublicKeyFromJwk(JwkKey jwk) {
-        if (jwk == null || !"EC".equalsIgnoreCase(jwk.kty()) || jwk.x() == null || jwk.y() == null) {
-            throw new Ap2MandateException(Ap2ErrorCode.AGENT_MISSING_KEY, "Invalid EC JWK definition");
+        if (jwk.y() == null) {
+            throw new Ap2MandateException(Ap2ErrorCode.AGENT_MISSING_KEY, "EC JWK is missing y coordinate");
         }
         try {
             String stdCurve = switch (jwk.crv() != null ? jwk.crv() : "P-256") {
@@ -587,8 +753,49 @@ public class Ap2MandateService {
             ECPublicKeySpec pubSpec = new ECPublicKeySpec(new ECPoint(x, y), ecSpec);
             return (ECPublicKey) KeyFactory.getInstance("EC").generatePublic(pubSpec);
         } catch (GeneralSecurityException | IllegalArgumentException e) {
-            throw new Ap2MandateException(Ap2ErrorCode.AGENT_MISSING_KEY, "Failed to reconstruct EC public key from JWK", e);
+            throw new Ap2MandateException(Ap2ErrorCode.AGENT_MISSING_KEY,
+                    "Failed to reconstruct EC public key from JWK", e);
         }
+    }
+
+    private static EdECPublicKey parseEd25519PublicKeyFromJwk(JwkKey jwk) {
+        if (!"Ed25519".equals(jwk.crv())) {
+            throw new Ap2MandateException(Ap2ErrorCode.AGENT_MISSING_KEY,
+                    "Unsupported OKP curve: " + jwk.crv());
+        }
+        try {
+            byte[] raw = B64_URL_DEC.decode(jwk.x());
+            if (raw.length != 32) {
+                throw new IllegalArgumentException("Ed25519 public key must be 32 bytes");
+            }
+            boolean xOdd = (raw[31] & 0x80) != 0;
+            byte[] bigEndianY = new byte[32];
+            for (int i = 0; i < 32; i++) {
+                bigEndianY[i] = raw[31 - i];
+            }
+            bigEndianY[0] &= 0x7F;
+            BigInteger y = new BigInteger(1, bigEndianY);
+            EdECPublicKeySpec pubSpec = new EdECPublicKeySpec(NamedParameterSpec.ED25519, new EdECPoint(xOdd, y));
+            return (EdECPublicKey) KeyFactory.getInstance("Ed25519").generatePublic(pubSpec);
+        } catch (GeneralSecurityException | IllegalArgumentException e) {
+            throw new Ap2MandateException(Ap2ErrorCode.AGENT_MISSING_KEY,
+                    "Failed to reconstruct Ed25519 public key from OKP JWK", e);
+        }
+    }
+
+    private static byte[] encodeEd25519PublicKeyBytes(EdECPublicKey edKey) {
+        EdECPoint point = edKey.getPoint();
+        byte[] bigEndianY = toFixedUnsignedBytes(point.getY(), 32);
+        byte[] littleEndian = new byte[32];
+        for (int i = 0; i < 32; i++) {
+            littleEndian[i] = bigEndianY[31 - i];
+        }
+        if (point.isXOdd()) {
+            littleEndian[31] |= (byte) 0x80;
+        } else {
+            littleEndian[31] &= (byte) 0x7F;
+        }
+        return littleEndian;
     }
 
     private static String sha256Base64Url(byte[] input) {
@@ -620,11 +827,15 @@ public class Ap2MandateService {
         if (alg == null || alg.isBlank()) {
             return "ES256";
         }
-        String upper = alg.trim().toUpperCase();
+        String trimmed = alg.trim();
+        if ("EDDSA".equalsIgnoreCase(trimmed) || "ED25519".equalsIgnoreCase(trimmed)) {
+            return "EdDSA";
+        }
+        String upper = trimmed.toUpperCase();
         return switch (upper) {
             case "ES256", "ES384", "ES512" -> upper;
             default -> throw new Ap2MandateException(Ap2ErrorCode.MANDATE_INVALID_SIGNATURE,
-                    "Unsupported AP2 JWS algorithm: " + alg);
+                    "Unsupported UCP JWA algorithm: " + alg);
         };
     }
 
@@ -633,6 +844,7 @@ public class Ap2MandateService {
             case "ES256" -> "SHA256withECDSAinP1363Format";
             case "ES384" -> "SHA384withECDSAinP1363Format";
             case "ES512" -> "SHA512withECDSAinP1363Format";
+            case "EdDSA" -> "Ed25519";
             default -> throw new IllegalArgumentException("Unsupported algorithm: " + alg);
         };
     }
@@ -642,7 +854,7 @@ public class Ap2MandateService {
             case "ES256" -> "secp256r1";
             case "ES384" -> "secp384r1";
             case "ES512" -> "secp521r1";
-            default -> throw new IllegalArgumentException("Unsupported algorithm: " + alg);
+            default -> throw new IllegalArgumentException("Unsupported EC algorithm: " + alg);
         };
     }
 
@@ -651,7 +863,7 @@ public class Ap2MandateService {
             case "ES256" -> "P-256";
             case "ES384" -> "P-384";
             case "ES512" -> "P-521";
-            default -> throw new IllegalArgumentException("Unsupported algorithm: " + alg);
+            default -> throw new IllegalArgumentException("Unsupported EC algorithm: " + alg);
         };
     }
 
@@ -660,17 +872,23 @@ public class Ap2MandateService {
             case "ES256" -> 32;
             case "ES384" -> 48;
             case "ES512" -> 66;
-            default -> throw new IllegalArgumentException("Unsupported algorithm: " + alg);
+            default -> throw new IllegalArgumentException("Unsupported EC algorithm: " + alg);
         };
     }
 
-    private static String curveAlgorithmForKey(ECPublicKey key) {
-        int fieldSize = key.getParams().getCurve().getField().getFieldSize();
-        if (fieldSize <= 256) {
-            return "ES256";
-        } else if (fieldSize <= 384) {
-            return "ES384";
+    private static String algorithmForPublicKey(PublicKey key) {
+        if (key instanceof EdECPublicKey) {
+            return "EdDSA";
         }
-        return "ES512";
+        if (key instanceof ECPublicKey ecKey) {
+            int fieldSize = ecKey.getParams().getCurve().getField().getFieldSize();
+            if (fieldSize <= 256) {
+                return "ES256";
+            } else if (fieldSize <= 384) {
+                return "ES384";
+            }
+            return "ES512";
+        }
+        throw new IllegalArgumentException("Unsupported PublicKey type: " + key.getClass());
     }
 }
