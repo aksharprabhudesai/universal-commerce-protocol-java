@@ -4,7 +4,9 @@ import dev.ucomprotocol.ap2.JwkKey;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Configuration properties for the Universal Commerce Protocol library.
@@ -33,6 +35,27 @@ public class UcpProperties {
      * Endpoint URL for the commerce provider.
      */
     private String endpoint;
+
+    /**
+     * Optional map of older UCP protocol versions supported by this business to
+     * their self-contained profile URIs (serialized as
+     * {@code ucp.supported_versions} at {@code /.well-known/ucp}).
+     */
+    private Map<String, String> supportedVersions = new LinkedHashMap<>();
+
+    /**
+     * Payment handler declarations keyed by reverse-domain handler name
+     * (serialized as required {@code ucp.payment_handlers} at
+     * {@code /.well-known/ucp}).
+     */
+    private Map<String, List<PaymentHandler>> paymentHandlers = new LinkedHashMap<>();
+
+    /**
+     * Additional public signing keys ({@code EC} or {@code OKP}/{@code Ed25519})
+     * published in top-level {@code keys[]} at {@code /.well-known/ucp} (e.g.,
+     * for RFC 9421 HTTP Message Signatures and Web Bot Auth interop).
+     */
+    private List<TrustedKey> keys = new ArrayList<>();
 
     /**
      * Transport endpoints advertised for the {@code dev.ucp.shopping} service
@@ -121,6 +144,62 @@ public class UcpProperties {
      */
     public void setEndpoint(String endpoint) {
         this.endpoint = endpoint;
+    }
+
+    /**
+     * Returns the map of older supported UCP protocol versions to profile URIs.
+     *
+     * @return supported versions map
+     */
+    public Map<String, String> getSupportedVersions() {
+        return supportedVersions;
+    }
+
+    /**
+     * Sets the map of older supported UCP protocol versions to profile URIs.
+     *
+     * @param supportedVersions supported versions map
+     */
+    public void setSupportedVersions(Map<String, String> supportedVersions) {
+        this.supportedVersions = supportedVersions;
+    }
+
+    /**
+     * Returns the configured payment handler registry entries.
+     *
+     * @return payment handlers keyed by reverse-domain name
+     */
+    public Map<String, List<PaymentHandler>> getPaymentHandlers() {
+        return paymentHandlers;
+    }
+
+    /**
+     * Sets the configured payment handler registry entries.
+     *
+     * @param paymentHandlers payment handlers keyed by reverse-domain name
+     */
+    public void setPaymentHandlers(Map<String, List<PaymentHandler>> paymentHandlers) {
+        this.paymentHandlers = paymentHandlers;
+    }
+
+    /**
+     * Returns the additional public signing keys published in top-level
+     * {@code keys[]} at {@code /.well-known/ucp}.
+     *
+     * @return list of public signing keys
+     */
+    public List<TrustedKey> getKeys() {
+        return keys;
+    }
+
+    /**
+     * Sets the additional public signing keys published in top-level
+     * {@code keys[]} at {@code /.well-known/ucp}.
+     *
+     * @param keys list of public signing keys
+     */
+    public void setKeys(List<TrustedKey> keys) {
+        this.keys = keys;
     }
 
     /**
@@ -324,24 +403,24 @@ public class UcpProperties {
         private String keyId = "merchant-ap2-key-1";
 
         /**
-         * JWS ECDSA algorithm ({@code ES256}, {@code ES384}, or {@code ES512}).
+         * JWA signature algorithm ({@code ES256}, {@code ES384}, {@code ES512},
+         * or {@code EdDSA}).
          */
         private String algorithm = "ES256";
 
         /**
-         * Optional PKCS#8 PEM or Base64-encoded EC private key for merchant
-         * signing.
+         * Optional PKCS#8 PEM or Base64-encoded private key for merchant signing.
          */
         private String signingPrivateKey;
 
         /**
-         * Optional X.509 PEM or Base64-encoded EC public key corresponding to
+         * Optional X.509 PEM or Base64-encoded public key corresponding to
          * {@code signingPrivateKey}.
          */
         private String signingPublicKey;
 
         /**
-         * Whether to automatically generate an in-memory ephemeral EC key pair on
+         * Whether to automatically generate an in-memory ephemeral key pair on
          * startup when {@code signingPrivateKey} is omitted.
          */
         private boolean autoGenerateEphemeralKey = true;
@@ -372,8 +451,9 @@ public class UcpProperties {
         private List<String> vpFormats = new ArrayList<>(List.of("dc+sd-jwt"));
 
         /**
-         * Pre-trusted platform or agent public EC JWKs allowed to sign
-         * {@code ap2.checkout_mandate} credentials.
+         * Pre-trusted platform or agent public JWKs ({@code EC} or
+         * {@code OKP}/{@code Ed25519}) allowed to sign {@code ap2.checkout_mandate}
+         * credentials.
          */
         private List<TrustedKey> trustedPlatformKeys = new ArrayList<>();
 
@@ -414,16 +494,16 @@ public class UcpProperties {
         }
 
         /**
-         * Returns the configured JWS ECDSA algorithm.
+         * Returns the configured JWA signature algorithm.
          *
-         * @return the algorithm ({@code ES256}, {@code ES384}, or {@code ES512})
+         * @return the algorithm ({@code ES256}, {@code ES384}, {@code ES512}, or {@code EdDSA})
          */
         public String getAlgorithm() {
             return algorithm;
         }
 
         /**
-         * Sets the JWS ECDSA algorithm.
+         * Sets the JWA signature algorithm.
          *
          * @param algorithm the algorithm name
          */
@@ -432,7 +512,7 @@ public class UcpProperties {
         }
 
         /**
-         * Returns the configured PKCS#8 EC private key PEM or Base64 string.
+         * Returns the configured PKCS#8 private key PEM or Base64 string.
          *
          * @return the private key text, or {@code null}
          */
@@ -441,7 +521,7 @@ public class UcpProperties {
         }
 
         /**
-         * Sets the PKCS#8 EC private key PEM or Base64 string.
+         * Sets the PKCS#8 private key PEM or Base64 string.
          *
          * @param signingPrivateKey the private key text
          */
@@ -450,7 +530,7 @@ public class UcpProperties {
         }
 
         /**
-         * Returns the configured X.509 EC public key PEM or Base64 string.
+         * Returns the configured X.509 public key PEM or Base64 string.
          *
          * @return the public key text, or {@code null}
          */
@@ -459,7 +539,7 @@ public class UcpProperties {
         }
 
         /**
-         * Sets the X.509 EC public key PEM or Base64 string.
+         * Sets the X.509 public key PEM or Base64 string.
          *
          * @param signingPublicKey the public key text
          */
@@ -468,7 +548,7 @@ public class UcpProperties {
         }
 
         /**
-         * Returns whether an ephemeral EC key pair is generated when no explicit
+         * Returns whether an ephemeral key pair is generated when no explicit
          * key pair is configured.
          *
          * @return {@code true} if ephemeral key generation is enabled
@@ -478,7 +558,7 @@ public class UcpProperties {
         }
 
         /**
-         * Sets whether to generate an ephemeral EC key pair when no explicit key
+         * Sets whether to generate an ephemeral key pair when no explicit key
          * pair is configured.
          *
          * @param autoGenerateEphemeralKey {@code true} to allow ephemeral keys
@@ -562,7 +642,7 @@ public class UcpProperties {
         }
 
         /**
-         * Returns the configured list of trusted platform public EC keys.
+         * Returns the configured list of trusted platform public JWKs.
          *
          * @return list of trusted keys
          */
@@ -571,7 +651,7 @@ public class UcpProperties {
         }
 
         /**
-         * Sets the configured list of trusted platform public EC keys.
+         * Sets the configured list of trusted platform public JWKs.
          *
          * @param trustedPlatformKeys list of trusted keys
          */
@@ -581,7 +661,174 @@ public class UcpProperties {
     }
 
     /**
-     * Bindable configuration POJO representing a trusted platform EC public JWK.
+     * Bindable configuration POJO representing a UCP {@code payment_handler.json}
+     * entry in {@code ucp.payment_handlers}.
+     */
+    public static class PaymentHandler {
+        private String id;
+        private String version = "2026-08-25";
+        private String spec;
+        private String schema;
+        private List<AvailableInstrument> availableInstruments = new ArrayList<>();
+        private Map<String, Object> config = new LinkedHashMap<>();
+
+        /**
+         * Returns the unique payment handler instance identifier.
+         *
+         * @return handler ID
+         */
+        public String getId() {
+            return id;
+        }
+
+        /**
+         * Sets the unique payment handler instance identifier.
+         *
+         * @param id handler ID
+         */
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        /**
+         * Returns the payment handler specification version ({@code YYYY-MM-DD}).
+         *
+         * @return version string
+         */
+        public String getVersion() {
+            return version;
+        }
+
+        /**
+         * Sets the payment handler specification version ({@code YYYY-MM-DD}).
+         *
+         * @param version version string
+         */
+        public void setVersion(String version) {
+            this.version = version;
+        }
+
+        /**
+         * Returns the human-readable specification URL.
+         *
+         * @return specification URL
+         */
+        public String getSpec() {
+            return spec;
+        }
+
+        /**
+         * Sets the human-readable specification URL.
+         *
+         * @param spec specification URL
+         */
+        public void setSpec(String spec) {
+            this.spec = spec;
+        }
+
+        /**
+         * Returns the JSON Schema URL for this payment handler.
+         *
+         * @return schema URL
+         */
+        public String getSchema() {
+            return schema;
+        }
+
+        /**
+         * Sets the JSON Schema URL for this payment handler.
+         *
+         * @param schema schema URL
+         */
+        public void setSchema(String schema) {
+            this.schema = schema;
+        }
+
+        /**
+         * Returns the available payment instrument types and constraints.
+         *
+         * @return list of available instruments
+         */
+        public List<AvailableInstrument> getAvailableInstruments() {
+            return availableInstruments;
+        }
+
+        /**
+         * Sets the available payment instrument types and constraints.
+         *
+         * @param availableInstruments list of available instruments
+         */
+        public void setAvailableInstruments(List<AvailableInstrument> availableInstruments) {
+            this.availableInstruments = availableInstruments;
+        }
+
+        /**
+         * Returns the handler-specific discovery configuration map.
+         *
+         * @return configuration map
+         */
+        public Map<String, Object> getConfig() {
+            return config;
+        }
+
+        /**
+         * Sets the handler-specific discovery configuration map.
+         *
+         * @param config configuration map
+         */
+        public void setConfig(Map<String, Object> config) {
+            this.config = config;
+        }
+    }
+
+    /**
+     * Bindable configuration POJO representing an
+     * {@code available_payment_instrument.json} entry on a {@link PaymentHandler}.
+     */
+    public static class AvailableInstrument {
+        private String type;
+        private Map<String, Object> constraints = new LinkedHashMap<>();
+
+        /**
+         * Returns the payment instrument type (e.g., {@code card}, {@code shop_pay}).
+         *
+         * @return instrument type
+         */
+        public String getType() {
+            return type;
+        }
+
+        /**
+         * Sets the payment instrument type.
+         *
+         * @param type instrument type
+         */
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        /**
+         * Returns optional constraint expressions for this instrument type.
+         *
+         * @return constraints map
+         */
+        public Map<String, Object> getConstraints() {
+            return constraints;
+        }
+
+        /**
+         * Sets optional constraint expressions for this instrument type.
+         *
+         * @param constraints constraints map
+         */
+        public void setConstraints(Map<String, Object> constraints) {
+            this.constraints = constraints;
+        }
+    }
+
+    /**
+     * Bindable configuration POJO representing a public JWK ({@code EC} or
+     * {@code OKP}/{@code Ed25519}).
      */
     public static class TrustedKey {
         private String kid;
@@ -598,7 +845,8 @@ public class UcpProperties {
          * @return {@link JwkKey} record
          */
         public JwkKey toJwkKey() {
-            return new JwkKey(kid, kty, crv, x, y, use, alg);
+            String effectiveY = "OKP".equalsIgnoreCase(kty) ? null : y;
+            return new JwkKey(kid, kty, crv, x, effectiveY, use, alg);
         }
 
         /**
@@ -620,7 +868,7 @@ public class UcpProperties {
         }
 
         /**
-         * Returns the JWK key type ({@code kty}).
+         * Returns the JWK key type ({@code EC} or {@code OKP}).
          *
          * @return key type
          */
@@ -629,7 +877,7 @@ public class UcpProperties {
         }
 
         /**
-         * Sets the JWK key type ({@code kty}).
+         * Sets the JWK key type ({@code EC} or {@code OKP}).
          *
          * @param kty key type
          */
@@ -638,7 +886,8 @@ public class UcpProperties {
         }
 
         /**
-         * Returns the EC curve name ({@code crv}).
+         * Returns the curve name ({@code P-256}, {@code P-384}, {@code P-521}, or
+         * {@code Ed25519}).
          *
          * @return curve name
          */
@@ -647,7 +896,7 @@ public class UcpProperties {
         }
 
         /**
-         * Sets the EC curve name ({@code crv}).
+         * Sets the curve name.
          *
          * @param crv curve name
          */
@@ -656,7 +905,7 @@ public class UcpProperties {
         }
 
         /**
-         * Returns the base64url-encoded X coordinate.
+         * Returns the base64url-encoded X coordinate (or 32-byte Ed25519 public key).
          *
          * @return X coordinate
          */
@@ -674,7 +923,7 @@ public class UcpProperties {
         }
 
         /**
-         * Returns the base64url-encoded Y coordinate.
+         * Returns the base64url-encoded Y coordinate ({@code null} for {@code OKP}).
          *
          * @return Y coordinate
          */
@@ -710,7 +959,8 @@ public class UcpProperties {
         }
 
         /**
-         * Returns the JWS algorithm ({@code alg}).
+         * Returns the JWA signature algorithm ({@code ES256}, {@code ES384},
+         * {@code ES512}, or {@code EdDSA}).
          *
          * @return algorithm name
          */
@@ -719,7 +969,7 @@ public class UcpProperties {
         }
 
         /**
-         * Sets the JWS algorithm ({@code alg}).
+         * Sets the JWA signature algorithm.
          *
          * @param alg algorithm name
          */

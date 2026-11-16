@@ -30,8 +30,8 @@ import org.springframework.core.Ordered;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.security.KeyPair;
-import java.security.interfaces.ECPrivateKey;
-import java.security.interfaces.ECPublicKey;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.util.List;
 
 /**
@@ -135,20 +135,20 @@ class UcpAp2Configuration {
                 ? ap2.getKeyId().trim()
                 : "merchant-ap2-key-1";
 
-        ECPrivateKey privateKey;
-        ECPublicKey publicKey;
+        PrivateKey privateKey;
+        PublicKey publicKey;
         boolean hasPrivate = ap2.getSigningPrivateKey() != null && !ap2.getSigningPrivateKey().isBlank();
         boolean hasPublic = ap2.getSigningPublicKey() != null && !ap2.getSigningPublicKey().isBlank();
 
         if (hasPrivate && hasPublic) {
-            privateKey = Ap2MandateService.parsePrivateKey(ap2.getSigningPrivateKey());
-            publicKey = Ap2MandateService.parsePublicKey(ap2.getSigningPublicKey());
-            logger.info("Configured AP2MandateService with explicit EC key pair (kid={}, alg={})", keyId, algorithm);
+            privateKey = Ap2MandateService.parseSigningPrivateKey(ap2.getSigningPrivateKey(), algorithm);
+            publicKey = Ap2MandateService.parseSigningPublicKey(ap2.getSigningPublicKey(), algorithm);
+            logger.info("Configured AP2MandateService with explicit key pair (kid={}, alg={})", keyId, algorithm);
         } else if (!hasPrivate && !hasPublic && ap2.isAutoGenerateEphemeralKey()) {
-            KeyPair ephemeral = Ap2MandateService.generateEcKeyPair(algorithm);
-            privateKey = (ECPrivateKey) ephemeral.getPrivate();
-            publicKey = (ECPublicKey) ephemeral.getPublic();
-            logger.info("Configured AP2MandateService with ephemeral EC key pair (kid={}, alg={})", keyId, algorithm);
+            KeyPair ephemeral = Ap2MandateService.generateKeyPair(algorithm);
+            privateKey = ephemeral.getPrivate();
+            publicKey = ephemeral.getPublic();
+            logger.info("Configured AP2MandateService with ephemeral key pair (kid={}, alg={})", keyId, algorithm);
         } else {
             throw new IllegalStateException(
                     "AP2 is enabled (ucp.ap2.enabled=true) without both ucp.ap2.signing-private-key and "

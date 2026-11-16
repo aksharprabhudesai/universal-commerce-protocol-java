@@ -15,40 +15,22 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Controller that exposes the Universal Commerce Protocol (UCP) discovery
  * endpoint.
  * <p>
  * This endpoint is available at {@code /.well-known/ucp} and returns the
- * business profile of this commerce service. It adheres to the UCP
- * specification version {@value #UCP_VERSION}, using the canonical
- * namespace {@code dev.ucp} for all capabilities and services.
- * <p>
- * Capabilities are dynamically discovered based on the registered
- * {@link CommerceAdapter} and enabled protocol extensions:
- * <ul>
- * <li>{@code dev.ucp.shopping.catalog.search} and
- * {@code dev.ucp.shopping.catalog.lookup}: Present if
- * {@link CommerceAdapter#getCatalogAdapter()} is not null.</li>
- * <li>{@code dev.ucp.shopping.cart}: Present if
- * {@link CommerceAdapter#getCartAdapter()} is not null.</li>
- * <li>{@code dev.ucp.shopping.checkout}: Present if
- * {@link CommerceAdapter#getCheckoutAdapter()} is not null.</li>
- * <li>{@code dev.ucp.common.payment.ap2_mandate}: Present if AP2 Mandates
- * ({@code ucp.ap2.enabled=true}) and {@code dev.ucp.shopping.checkout} are
- * active, publishing the merchant public EC key in top-level {@code keys[]}.</li>
- * <li>{@code dev.ucp.shopping.order}: Present if
- * {@link CommerceAdapter#getOrderAdapter()} is not null.</li>
- * <li>{@code dev.ucp.common.identity_linking}: Present if
- * {@link CommerceAdapter#getCustomerAdapter()} is not null.</li>
- * </ul>
- * <p>
- * Services ({@code dev.ucp.shopping}) are advertised for each transport
- * endpoint configured under {@code ucp.services.*} in
- * {@link UcpProperties}.
+ * business profile of this commerce service conforming to
+ * {@code ucp.json#/$defs/business_schema} in UCP specification version
+ * {@value #UCP_VERSION}, including required {@code ucp.services} and
+ * {@code ucp.payment_handlers} registries, optional
+ * {@code ucp.supported_versions}, dynamic {@code ucp.capabilities}, and
+ * top-level {@code keys[]} (RFC 7517 / RFC 8037 JWK Set).
  */
 @RestController
 @RequestMapping("/.well-known/ucp")
@@ -112,7 +94,6 @@ public class UcpDiscoveryController {
     @GetMapping
     public DiscoveryResponse getDiscoveryInfo() {
         Map<String, List<Capability>> capabilities = new LinkedHashMap<>();
-        List<JwkKey> keys = null;
 
         if (commerceAdapter.getCatalogAdapter() != null) {
             capabilities.put("dev.ucp.shopping.catalog.search", List.of(capability(
@@ -147,7 +128,6 @@ public class UcpDiscoveryController {
                         BASE_URL + "/schemas/common/payment_ap2_mandate.json",
                         "dev.ucp.shopping.checkout",
                         ap2Config)));
-                keys = List.of(ap2MandateService.getMerchantPublicJwk());
             }
         }
         if (commerceAdapter.getOrderAdapter() != null) {
@@ -159,7 +139,100 @@ public class UcpDiscoveryController {
                     "/specification/common/identity-linking/", "/schemas/common/identity_linking.json")));
         }
 
-        return new DiscoveryResponse(new UcpInfo(UCP_VERSION, resolveServices(), capabilities), keys);
+        Map<String, String> supportedVersions = resolveSupportedVersions();
+        Map<String, List<PaymentHandler>> paymentHandlers = resolvePaymentHandlers();
+        List<JwkKey> keys = resolvePublicKeys();
+
+        return new DiscoveryResponse(
+                new UcpInfo(UCP_VERSION, supportedVersions, resolveServices(), capabilities, paymentHandlers),
+                keys);
+    }
+
+    private Map<String, String> resolveSupportedVersions() {
+        Map<String, String> configured = ucpProperties.getSupportedVersions();
+        if (configured == null || configured.isEmpty()) {
+            return null;
+        }
+        Map<String, String> clean = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : configured.entrySet()) {
+            if (hasText(entry.getKey()) && hasText(entry.getValue())) {
+                clean.put(entry.getKey().trim(), entry.getValue().trim());
+            }
+        }
+        return clean.isEmpty() ? null : Collections.unmodifiableMap(clean);
+    }
+
+    private Map<String, List<PaymentHandler>> resolvePaymentHandlers() {
+        Map<String, List<UcpProperties.PaymentHandler>> configured = ucpProperties.getPaymentHandlers();
+        if (configured == null || configured.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, List<PaymentHandler>> resolved = new LinkedHashMap<>();
+        for (Map.Entry<String, List<UcpProperties.PaymentHandler>> entry : configured.entrySet()) {
+            if (!hasText(entry.getKey()) || entry.getValue() == null || entry.getValue().isEmpty()) {
+                continue;
+            }
+            List<PaymentHandler> handlers = new ArrayList<>();
+            for (UcpProperties.PaymentHandler ph : entry.getValue()) {
+                if (ph == null || !hasText(ph.getId())) {
+                    continue;
+                }
+                String ver = hasText(ph.getVersion()) ? ph.getVersion().trim() : UCP_VERSION;
+                List<AvailableInstrument> instruments = null;
+                if (ph.getAvailableInstruments() != null && !ph.getAvailableInstruments().isEmpty()) {
+                    List<AvailableInstrument> mapped = ph.getAvailableInstruments().stream()
+                            .filter(inst -> inst != null && hasText(inst.getType()))
+                            .map(inst -> new AvailableInstrument(
+                                    inst.getType().trim(),
+                                    inst.getConstraints() != null && !inst.getConstraints().isEmpty()
+                                            ? Map.copyOf(inst.getConstraints())
+                                            : null))
+                            .toList();
+                    if (!mapped.isEmpty()) {
+                        instruments = mapped;
+                    }
+                }
+                Map<String, Object> cfg = ph.getConfig() != null && !ph.getConfig().isEmpty()
+                        ? Collections.unmodifiableMap(new LinkedHashMap<>(ph.getConfig()))
+                        : null;
+                handlers.add(new PaymentHandler(
+                        ph.getId().trim(),
+                        ver,
+                        hasText(ph.getSpec()) ? ph.getSpec().trim() : null,
+                        hasText(ph.getSchema()) ? ph.getSchema().trim() : null,
+                        instruments,
+                        cfg));
+            }
+            if (!handlers.isEmpty()) {
+                resolved.put(entry.getKey().trim(), List.copyOf(handlers));
+            }
+        }
+        return resolved.isEmpty() ? Collections.emptyMap() : Collections.unmodifiableMap(resolved);
+    }
+
+    private List<JwkKey> resolvePublicKeys() {
+        List<JwkKey> keys = new ArrayList<>();
+        Set<String> seenKids = new LinkedHashSet<>();
+
+        if (ucpProperties.getKeys() != null) {
+            for (UcpProperties.TrustedKey configuredKey : ucpProperties.getKeys()) {
+                if (configuredKey != null && hasText(configuredKey.getKid()) && hasText(configuredKey.getX())) {
+                    JwkKey jwk = configuredKey.toJwkKey();
+                    if (seenKids.add(jwk.kid())) {
+                        keys.add(jwk);
+                    }
+                }
+            }
+        }
+
+        if (ap2MandateService != null && commerceAdapter.getCheckoutAdapter() != null) {
+            JwkKey ap2Key = ap2MandateService.getMerchantPublicJwk();
+            if (seenKids.add(ap2Key.kid())) {
+                keys.add(ap2Key);
+            }
+        }
+
+        return keys.isEmpty() ? null : List.copyOf(keys);
     }
 
     private Map<String, List<Service>> resolveServices() {
@@ -200,8 +273,8 @@ public class UcpDiscoveryController {
      * Top-level response wrapper for UCP discovery.
      *
      * @param ucp  the protocol information object
-     * @param keys optional list of public signing keys (RFC 7517 JWKs) for
-     *             cryptographic extensions such as AP2 Mandates
+     * @param keys optional list of public signing keys (RFC 7517 / RFC 8037 JWKs)
+     *             for HTTP Message Signatures, Web Bot Auth, and AP2 Mandates
      */
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     public record DiscoveryResponse(UcpInfo ucp, List<JwkKey> keys) {
@@ -217,27 +290,58 @@ public class UcpDiscoveryController {
     }
 
     /**
-     * Detailed UCP protocol information.
+     * Detailed UCP protocol metadata conforming to
+     * {@code ucp.json#/$defs/business_schema}.
+     * <p>
+     * Both {@code services} and {@code payment_handlers} are always serialized
+     * (even when empty {@code {}}), whereas {@code supported_versions} is omitted
+     * when empty.
      *
-     * @param version      The protocol version (e.g., 2026-08-25).
-     * @param services     Service registry keyed by reverse-domain name
-     *                     (e.g., {@code dev.ucp.shopping}).
-     * @param capabilities Capability registry keyed by reverse-domain name
-     *                     (e.g., {@code dev.ucp.shopping.checkout}).
+     * @param version           The protocol version (e.g., {@code 2026-08-25}).
+     * @param supportedVersions Optional map of older supported protocol versions
+     *                          to their profile URIs.
+     * @param services          Service registry keyed by reverse-domain name.
+     * @param capabilities      Capability registry keyed by reverse-domain name.
+     * @param paymentHandlers   Payment handler registry keyed by reverse-domain name.
      */
-    public record UcpInfo(String version, Map<String, List<Service>> services,
-            Map<String, List<Capability>> capabilities) {
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record UcpInfo(
+            String version,
+            @JsonInclude(JsonInclude.Include.NON_EMPTY)
+            @JsonProperty("supported_versions")
+            Map<String, String> supportedVersions,
+            Map<String, List<Service>> services,
+            Map<String, List<Capability>> capabilities,
+            @JsonProperty("payment_handlers")
+            Map<String, List<PaymentHandler>> paymentHandlers) {
+
+        /**
+         * Creates a {@link UcpInfo} with empty {@code payment_handlers} and no
+         * {@code supported_versions}.
+         *
+         * @param version      protocol version
+         * @param services     service registry
+         * @param capabilities capability registry
+         */
+        public UcpInfo(
+                String version,
+                Map<String, List<Service>> services,
+                Map<String, List<Capability>> capabilities) {
+            this(version, null, services, capabilities, Collections.emptyMap());
+        }
     }
 
     /**
-     * Details about a specific capability version.
+     * Details about a specific capability or extension version
+     * ({@code capability.json}).
      *
      * @param version          The version of the capability spec supported.
-     * @param spec             The URL to the official UCP specification for this
-     *                         capability.
+     * @param spec             The URL to the human-readable UCP specification.
      * @param schema           The URL to the JSON Schema for this capability.
-     * @param parentCapability Optional parent capability name for extension
-     *                         capabilities (serialized as {@code extends}).
+     * @param id               Optional unique identifier disambiguating multiple instances.
+     * @param parentCapability Optional parent capability ({@code String} for single-parent
+     *                         or {@code List<String>} for multi-parent extensions,
+     *                         serialized as {@code extends}).
      * @param config           Optional capability-specific configuration map.
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -245,23 +349,66 @@ public class UcpDiscoveryController {
             String version,
             String spec,
             String schema,
-            @JsonProperty("extends") String parentCapability,
+            String id,
+            @JsonProperty("extends") Object parentCapability,
             Map<String, Object> config) {
 
         /**
-         * Creates a root capability entry without {@code extends} or {@code config}.
+         * Creates a root capability entry without {@code id}, {@code extends}, or {@code config}.
          *
          * @param version The version of the capability spec supported.
          * @param spec    The URL to the official UCP specification for this capability.
          * @param schema  The URL to the JSON Schema for this capability.
          */
         public Capability(String version, String spec, String schema) {
-            this(version, spec, schema, null, null);
+            this(version, spec, schema, null, null, null);
+        }
+
+        /**
+         * Creates a single-parent extension capability entry.
+         *
+         * @param version          The version of the capability spec supported.
+         * @param spec             The URL to the official UCP specification.
+         * @param schema           The URL to the JSON Schema.
+         * @param parentCapability Single parent capability name.
+         * @param config           Optional capability-specific configuration map.
+         */
+        public Capability(
+                String version,
+                String spec,
+                String schema,
+                String parentCapability,
+                Map<String, Object> config) {
+            this(version, spec, schema, null, (Object) parentCapability, config);
+        }
+
+        /**
+         * Creates a multi-parent extension capability entry (e.g., an extension
+         * augmenting both {@code dev.ucp.shopping.checkout} and
+         * {@code dev.ucp.shopping.cart}).
+         *
+         * @param version            The version of the capability spec supported.
+         * @param spec               The URL to the official UCP specification.
+         * @param schema             The URL to the JSON Schema.
+         * @param parentCapabilities List of parent capability names.
+         * @param config             Optional capability-specific configuration map.
+         */
+        public Capability(
+                String version,
+                String spec,
+                String schema,
+                List<String> parentCapabilities,
+                Map<String, Object> config) {
+            this(version, spec, schema, null,
+                    parentCapabilities != null && parentCapabilities.size() == 1
+                            ? parentCapabilities.get(0)
+                            : (parentCapabilities != null ? List.copyOf(parentCapabilities) : null),
+                    config);
         }
     }
 
     /**
-     * Details about a service transport binding.
+     * Details about a service transport binding ({@code service.json}).
      *
      * @param version   The version of the service spec supported.
      * @param spec      The URL to the official UCP specification for this service.
@@ -269,8 +416,66 @@ public class UcpDiscoveryController {
      *                  {@code a2a} or {@code embedded}).
      * @param endpoint  The endpoint URL for this transport binding.
      * @param schema    The URL to the schema describing this transport binding.
+     * @param id        Optional unique identifier disambiguating multiple instances.
+     * @param config    Optional transport-specific configuration map.
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    public record Service(String version, String spec, String transport, String endpoint, String schema) {
+    public record Service(
+            String version,
+            String spec,
+            String transport,
+            String endpoint,
+            String schema,
+            String id,
+            Map<String, Object> config) {
+
+        /**
+         * Creates a service binding without {@code id} or {@code config}.
+         *
+         * @param version   service version
+         * @param spec      specification URL
+         * @param transport transport protocol
+         * @param endpoint  transport endpoint URL
+         * @param schema    transport schema URL
+         */
+        public Service(String version, String spec, String transport, String endpoint, String schema) {
+            this(version, spec, transport, endpoint, schema, null, null);
+        }
+    }
+
+    /**
+     * Payment handler declaration ({@code payment_handler.json}).
+     *
+     * @param id                   Unique identifier for this payment handler instance.
+     * @param version              Entity version in {@code YYYY-MM-DD} format.
+     * @param spec                 Optional URL to human-readable handler specification.
+     * @param schema               Optional URL to handler JSON Schema.
+     * @param availableInstruments Optional list of supported instrument types and constraints.
+     * @param config               Optional handler-specific discovery configuration.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record PaymentHandler(
+            String id,
+            String version,
+            String spec,
+            String schema,
+            @JsonInclude(JsonInclude.Include.NON_EMPTY)
+            @JsonProperty("available_instruments")
+            List<AvailableInstrument> availableInstruments,
+            @JsonInclude(JsonInclude.Include.NON_EMPTY)
+            Map<String, Object> config) {
+    }
+
+    /**
+     * Available payment instrument entry ({@code available_payment_instrument.json}).
+     *
+     * @param type        Instrument type identifier (e.g., {@code card}, {@code shop_pay}).
+     * @param constraints Optional constraint expression map.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record AvailableInstrument(
+            String type,
+            @JsonInclude(JsonInclude.Include.NON_EMPTY)
+            Map<String, Object> constraints) {
     }
 }
